@@ -2,6 +2,7 @@ import caldav
 import datetime
 import flask
 import fort
+import jour.filters
 import jour.models
 import pathlib
 import waitress
@@ -68,4 +69,5 @@ def main():
     db = _get_db()
     jour.models.init(db)
     app.secret_key = jour.models.settings.secret_key(db)
+    app.add_template_filter(jour.filters.md)
     waitress.serve(app)

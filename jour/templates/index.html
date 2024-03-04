@@ -10,7 +10,7 @@
     {% for e in g.collection.journals() %}
         <tr>
             <td>{{ e.icalendar_component.dtstart.dt }}</td>
-            <td>{{ e.icalendar_component.description }}</td>
+            <td>{{ e.icalendar_component.description | md }}</td>
         </tr>
     {% endfor %}
     </tbody>
@@ -18,7 +18,7 @@
 
 <form action="{{ url_for('new') }}" method="post">
     <label for="entry-date">Date</label>
-    <input id="entry-date" name="entry-date" type="date">
+    <input id="entry-date" name="entry-date" required type="date">
 
     <label for="entry-text">Text</label>
     <textarea id="entry-text" name="entry-text"></textarea>
