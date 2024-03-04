@@ -26,7 +26,7 @@ def _set(db: 'fort.SqliteDatabase', setting_id: str, setting_value: str):
         'setting_id': setting_id,
         'setting_value': setting_value,
     }
-    db.q(sql, params)
+    db.u(sql, params)
 
 
 def get_enc(db: 'fort.SqliteDatabase', setting_id: str):
@@ -50,3 +50,12 @@ def secret_key(db: 'fort.SQLiteDatabase'):
     if secret_key is None:
         _set(db, setting_id, cryptography.fernet.Fernet.generate_key().decode())
     return _get(db, setting_id)
+
+
+def set_enc(db: 'fort.SqliteDatabase', setting_id: str, setting_value: str):
+    f = cryptography.fernet.Fernet(secret_key(db))
+    _set(db, setting_id, f.encrypt(setting_value.encode()))
+
+
+def set_str(db: 'fort.SqliteDatabase', setting_id: str, setting_value: str):
+    _set(db, setting_id, setting_value)
