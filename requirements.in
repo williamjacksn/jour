@@ -3,5 +3,6 @@ cryptography
 flask
 fort
 markdown
+markupsafe
 notch
 waitress

@@ -39,6 +39,7 @@ markdown==3.5.2
     # via -r requirements.in
 markupsafe==2.1.5
     # via
+    #   -r requirements.in
     #   jinja2
     #   werkzeug
 notch==2023.1
