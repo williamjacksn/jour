@@ -1,4 +1,5 @@
 import caldav
+import calendar
 import datetime
 import flask
 import fort
@@ -33,6 +34,10 @@ def index():
         flask.g.caldav_collection_url = jour.models.settings.get_str(flask.g.db, 'caldav/collection-url')
         if flask.g.caldav_collection_url:
             flask.g.collection = flask.g.caldav_client.calendar(url=flask.g.caldav_collection_url)
+            flask.g.cal = calendar.Calendar(firstweekday=calendar.SUNDAY)
+            flask.g.day_names = (calendar.day_name[i] for i in flask.g.cal.iterweekdays())
+            flask.g.today = datetime.date.today()
+            flask.g.month_name = calendar.month_name[flask.g.today.month]
             return flask.render_template('index.html')
         return flask.render_template('select-collection.html')
     return flask.render_template('configure.html')
