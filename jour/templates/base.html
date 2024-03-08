@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Jour</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-5.3.3.css') }}">
+</head>
+
+<body>
+
+<div class="container-fluid">
+    {% block content %}{% endblock %}
+</div>
+
+<script src="{{ url_for('static', filename='bootstrap-5.3.3.bundle.js') }}"></script>
+
+</body>
+
+</html>
