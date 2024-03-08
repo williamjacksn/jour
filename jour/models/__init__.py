@@ -1,4 +1,4 @@
-from . import settings
+from . import settings, journals
 
 import typing
 
@@ -17,6 +17,6 @@ def init(db: 'fort.SQLiteDatabase'):
         create table if not exists journals (
             journal_id uuid primary key,
             journal_date date,
-            journal_data text
+            journal_data blob
         )
     ''')

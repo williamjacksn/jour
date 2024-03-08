@@ -6,6 +6,7 @@ import fort
 import jour.filters
 import jour.models
 import pathlib
+import uuid
 import waitress
 
 app = flask.Flask(__name__)
@@ -34,6 +35,14 @@ def index():
         flask.g.caldav_collection_url = jour.models.settings.get_str(flask.g.db, 'caldav/collection-url')
         if flask.g.caldav_collection_url:
             flask.g.collection = flask.g.caldav_client.calendar(url=flask.g.caldav_collection_url)
+            for j in flask.g.collection.journals():
+                comp = j.icalendar_instance.subcomponents[0]
+                params = {
+                    'journal_id': uuid.UUID(comp['uid']),
+                    'journal_date': comp['dtstart'].dt,
+                    'journal_data': j.icalendar_instance.to_ical(),
+                }
+                jour.models.journals.upsert(flask.g.db, params)
             flask.g.cal = calendar.Calendar(firstweekday=calendar.SUNDAY)
             flask.g.day_names = (calendar.day_name[i] for i in flask.g.cal.iterweekdays())
             flask.g.today = datetime.date.today()
