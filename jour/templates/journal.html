@@ -1,0 +1,26 @@
+<div class="justify-content-between pt-3 row">
+    <div class="col-auto">
+        <button class="btn btn-outline-dark" hx-post="{{ url_for('monthly_calendar') }}" hx-target="#content"
+                name="date" type="button" value="{{ g.date }}">
+            <i class="bi-chevron-left"></i>
+        </button>
+    </div>
+    <div class="col-auto">
+        <h1>{{ g.date }}</h1>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-outline-success" type="submit">
+            <i class="bi-check-lg"></i>
+        </button>
+    </div>
+</div>
+
+<div class="pt-3 row">
+    <div class="col">
+        <form>
+            <div class="mb-3">
+                <textarea aria-label="Journal entry" class="form-control" rows="20"></textarea>
+            </div>
+        </form>
+    </div>
+</div>

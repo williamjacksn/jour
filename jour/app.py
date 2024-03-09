@@ -11,6 +11,7 @@ import waitress
 
 app = flask.Flask(__name__)
 
+
 def _get_db() -> fort.SQLiteDatabase:
     db_path = pathlib.Path().resolve() / '.local/jour.db'
     return fort.SQLiteDatabase(db_path)
@@ -24,7 +25,7 @@ def before_request():
             app.logger.debug(f'{k}: {v}')
 
 
-@app.get('/')
+@app.get('/stuff')
 def index():
     flask.g.caldav_url = jour.models.settings.get_str(flask.g.db, 'caldav/url')
     flask.g.caldav_username = jour.models.settings.get_str(flask.g.db, 'caldav/username')
@@ -64,6 +65,36 @@ def configure_credentials():
     jour.models.settings.set_str(flask.g.db, 'caldav/username', flask.request.values.get('caldav-username'))
     jour.models.settings.set_enc(flask.g.db, 'caldav/password', flask.request.values.get('caldav-password'))
     return flask.redirect(flask.url_for('index'))
+
+
+@app.get('/')
+def monthly():
+    flask.g.today = datetime.date.today()
+    return flask.render_template('monthly.html')
+
+
+@app.post('/journal')
+def journal():
+    flask.g.date = datetime.date.fromisoformat(flask.request.values.get('date'))
+    return flask.render_template('journal.html')
+
+
+@app.post('/journal/save')
+def journal_save():
+    return 'ok'
+
+
+@app.post('/monthly/calendar')
+def monthly_calendar():
+    requested_date = datetime.date.fromisoformat(flask.request.values.get('date'))
+    flask.g.selected_date = requested_date.replace(day=1)
+    flask.g.today = datetime.date.today()
+    flask.g.month_name = calendar.month_name[flask.g.selected_date.month]
+    flask.g.cal = calendar.Calendar(firstweekday=calendar.SUNDAY)
+    flask.g.day_names = (calendar.day_name[i][0:2] for i in flask.g.cal.iterweekdays())
+    flask.g.prev_month = flask.g.selected_date - datetime.timedelta(days=1)
+    flask.g.next_month = flask.g.selected_date + datetime.timedelta(days=31)
+    return flask.render_template('monthly-calendar.html')
 
 
 @app.post('/new')

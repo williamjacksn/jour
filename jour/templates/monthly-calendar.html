@@ -1,0 +1,60 @@
+<div class="justify-content-between pt-3 row">
+    <div class="col-auto">
+        <button class="btn btn-outline-primary" hx-post="{{ url_for('monthly_calendar') }}" hx-target="#content"
+                name="date" type="button" value="{{ g.prev_month }}">
+            <i class="bi-chevron-left"></i>
+        </button>
+    </div>
+
+    <div class="col-auto">
+        <h1>{{ g.month_name }} {{ g.selected_date.year }}</h1>
+    </div>
+
+    <div class="col-auto">
+    {% if g.selected_date < g.today.replace(day=1) %}
+        <button class="btn btn-outline-primary" hx-post="{{ url_for('monthly_calendar') }}" hx-target="#content"
+                name="date" type="button" value="{{ g.next_month }}">
+            <i class="bi-chevron-right"></i>
+        </button>
+    {% else %}
+        <button class="btn invisible" disabled>&rarr;</button>
+    {% endif %}
+    </div>
+</div>
+
+<div class="pt-3 row">
+    <div class="col">
+        <table class="fs-4 table text-center">
+            <thead>
+            <tr>
+            {% for d in g.day_names %}
+                <th>{{ d }}</th>
+            {% endfor %}
+            </tr>
+            </thead>
+            <tbody>
+            {% for w in g.cal.monthdatescalendar(g.selected_date.year, g.selected_date.month) %}
+                <tr>
+                {% for d in w %}
+                    {% if d.month == g.selected_date.month %}
+                        {% if d > g.today %}
+                            <td class="text-secondary">{{ d.day }}</td>
+                        {% else %}
+                            <td>
+                                <a class="text-decoration-none" href="#" hx-include="this"
+                                   hx-post="{{ url_for('journal') }}" hx-target="#content">
+                                    <input name="date" value="{{ d }}" type="hidden">
+                                    {{ d.day }}
+                                </a>
+                            </td>
+                        {% endif %}
+                    {% else %}
+                        <td></td>
+                    {% endif %}
+                {% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
