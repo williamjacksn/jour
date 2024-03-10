@@ -7,11 +7,11 @@
     </div>
 
     <div class="col-auto">
-        <h1>{{ g.month_name }} {{ g.selected_date.year }}</h1>
+        <h1>{{ g.month_name }} {{ g.start.year }}</h1>
     </div>
 
     <div class="col-auto">
-    {% if g.selected_date < g.today.replace(day=1) %}
+    {% if g.start < g.today.replace(day=1) %}
         <button class="btn btn-outline-primary" hx-post="{{ url_for('monthly_calendar') }}" hx-target="#content"
                 name="date" type="button" value="{{ g.next_month }}">
             <i class="bi-chevron-right"></i>
@@ -33,16 +33,16 @@
             </tr>
             </thead>
             <tbody>
-            {% for w in g.cal.monthdatescalendar(g.selected_date.year, g.selected_date.month) %}
+            {% for w in g.cal.monthdatescalendar(g.start.year, g.start.month) %}
                 <tr>
                 {% for d in w %}
-                    {% if d.month == g.selected_date.month %}
+                    {% if d.month == g.start.month %}
                         {% if d > g.today %}
                             <td class="text-secondary">{{ d.day }}</td>
                         {% else %}
-                            <td>
-                                <a class="text-decoration-none" href="#" hx-include="this"
-                                   hx-post="{{ url_for('journal') }}" hx-target="#content">
+                            <td {% if d in g.dates_with_journals %}class="table-success"{% endif %}>
+                                <a class="text-decoration-none {{ 'link-success' if d in g.dates_with_journals }}"
+                                   href="#" hx-include="this" hx-post="{{ url_for('journal') }}" hx-target="#content">
                                     <input name="date" value="{{ d }}" type="hidden">
                                     {{ d.day }}
                                 </a>

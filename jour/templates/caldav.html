@@ -1,0 +1,17 @@
+<h1>Journal entries</h1>
+<table>
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Text</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for e in g.collection.journals() %}
+        <tr>
+            <td>{{ e.icalendar_component.dtstart.dt }}</td>
+            <td>{{ e.icalendar_component.description | md }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>

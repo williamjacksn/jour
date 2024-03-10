@@ -1,28 +1,7 @@
+{% extends 'base.html' %}
 
-<h1>Journal entries</h1>
-<table>
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Text</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for e in g.collection.journals() %}
-        <tr>
-            <td>{{ e.icalendar_component.dtstart.dt }}</td>
-            <td>{{ e.icalendar_component.description | md }}</td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
-
-<form action="{{ url_for('new') }}" method="post">
-    <label for="entry-date">Date</label>
-    <input id="entry-date" name="entry-date" required type="date">
-
-    <label for="entry-text">Text</label>
-    <textarea id="entry-text" name="entry-text"></textarea>
-
-    <button type="submit">Submit</button>
-</form>
+{% block content %}
+    <div hx-include="this" hx-post="{{ url_for('monthly_calendar') }}" hx-trigger="load" id="content">
+        <input name="date" type="hidden" value="{{ g.today }}">
+    </div>
+{% endblock %}
