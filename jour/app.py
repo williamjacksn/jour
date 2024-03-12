@@ -13,7 +13,7 @@ import waitress
 app = flask.Flask(__name__)
 
 
-def _build_monthly_calendar(date: datetime.date):
+def _build_month(date: datetime.date):
     flask.g.start = date.replace(day=1)
     flask.g.end = date.replace(day=calendar.monthrange(date.year, date.month)[1])
     flask.g.dates_with_journals = jour.models.journals.list_dates_between(flask.g.db, flask.g.start, flask.g.end)
@@ -23,7 +23,17 @@ def _build_monthly_calendar(date: datetime.date):
     flask.g.day_names = (calendar.day_name[i][0:2] for i in flask.g.cal.iterweekdays())
     flask.g.prev_month = flask.g.start - datetime.timedelta(days=1)
     flask.g.next_month = flask.g.start + datetime.timedelta(days=31)
-    return flask.render_template('monthly-calendar.html')
+    return flask.render_template('month.html')
+
+
+def _build_url(endpoint: str, d: datetime.date):
+    year = d.year
+    month_ = d.strftime('%m')
+    day_ = d.strftime('%d')
+    if endpoint in ['month']:
+        return flask.url_for(endpoint, year=year, month_=month_)
+    if endpoint in ['day', 'day_delete', 'day_edit', 'day_update']:
+        return flask.url_for(endpoint, year=year, month_=month_, day_=day_)
 
 
 def _get_caldav_client(db: 'fort.SQLiteDatabase'):
@@ -57,14 +67,95 @@ def before_request():
 
 @app.get('/')
 def index():
-    flask.g.today = datetime.date.today()
-    return flask.render_template('index.html')
+    d = datetime.date.today()
+    return flask.redirect(_build_url('month', d))
+
+
+@app.get('/<year>/<month_>')
+def month(year, month_):
+    date = datetime.date(int(year), int(month_), 1)
+    return _build_month(date)
+
+
+@app.get('/<year>/<month_>/<day_>')
+def day(year, month_, day_, edit=False):
+    flask.g.date = datetime.date(int(year), int(month_), int(day_))
+    j = jour.models.journals.get_for_date(flask.g.db, flask.g.date)
+    if j:
+        parsed = icalendar.Calendar.from_ical(j['journal_data'])
+        flask.g.entry_text = parsed.subcomponents[0]['description']
+    else:
+        flask.g.entry_text = ''
+    if edit:
+        return flask.render_template('day-edit.html')
+    else:
+        return flask.render_template('day.html')
+
+
+@app.post('/<year>/<month_>/<day_>/delete')
+def day_delete(year, month_, day_):
+    collection = _get_caldav_collection(flask.g.db)
+    d = datetime.date(int(year), int(month_), int(day_))
+    existing = jour.models.journals.get_for_date(flask.g.db, d)
+    if existing:
+        uid = str(existing['journal_id'])
+        server_journal = collection.journal_by_uid(uid)
+        server_journal.delete()
+        jour.models.journals.delete(flask.g.db, d)
+    return flask.redirect(_build_url('month', d))
+
+
+@app.get('/<year>/<month_>/<day_>/edit')
+def day_edit(year, month_, day_):
+    return day(year, month_, day_, edit=True)
+
+
+@app.post('/<year>/<month_>/<day_>/update')
+def day_update(year, month_, day_):
+    collection = _get_caldav_collection(flask.g.db)
+    d = datetime.date(int(year), int(month_), int(day_))
+    description = flask.request.values.get('entry-text')
+    existing = jour.models.journals.get_for_date(flask.g.db, d)
+    if existing:
+        local_journal = icalendar.Calendar.from_ical(existing['journal_data'])
+        local_journal.subcomponents[0]['description'] = description
+        collection.save_journal(ical=local_journal.to_ical())
+        params = {
+            'journal_id': existing['journal_id'],
+            'journal_date': d,
+            'journal_data': local_journal.to_ical(),
+        }
+        jour.models.journals.upsert(flask.g.db, params)
+    else:
+        summary = f'Journal entry for {d}'
+        server_journal = collection.save_journal(dtstart=d, summary=summary, description=description)
+        params = {
+            'journal_id': uuid.UUID(server_journal.id),
+            'journal_date': d,
+            'journal_data': server_journal.icalendar_instance.to_ical(),
+        }
+        jour.models.journals.upsert(flask.g.db, params)
+    return flask.redirect(_build_url('day', d))
 
 
 @app.get('/caldav')
 def caldav_():
     flask.g.collection = _get_caldav_collection(flask.g.db)
     return flask.render_template('caldav.html')
+
+
+@app.get('/caldav/sync')
+def caldav_sync():
+    flask.g.collection = _get_caldav_collection(flask.g.db)
+    for j in flask.g.collection.journals():
+        comp = j.icalendar_instance.subcomponents[0]
+        params = {
+            'journal_id': uuid.UUID(comp['uid']),
+            'journal_date': comp['dtstart'].dt,
+            'journal_data': j.icalendar_instance.to_ical(),
+        }
+        jour.models.journals.upsert(flask.g.db, params)
+    return flask.redirect(flask.url_for('caldav_'))
 
 
 @app.post('/configure/collection')
@@ -81,82 +172,10 @@ def configure_credentials():
     return flask.redirect(flask.url_for('index'))
 
 
-@app.post('/journal')
-def journal():
-    flask.g.date = datetime.date.fromisoformat(flask.request.values.get('date'))
-    j = jour.models.journals.get_for_date(flask.g.db, flask.g.date)
-    if j:
-        parsed = icalendar.Calendar.from_ical(j['journal_data'])
-        flask.g.entry_text = parsed.subcomponents[0]['description']
-    else:
-        flask.g.entry_text = ''
-    return flask.render_template('journal.html')
-
-
-@app.post('/journal/delete')
-def journal_delete():
-    collection = _get_caldav_collection(flask.g.db)
-    date = datetime.date.fromisoformat(flask.request.values.get('entry-date'))
-    existing = jour.models.journals.get_for_date(flask.g.db, date)
-    if existing:
-        uid = str(existing['journal_id'])
-        server_journal = collection.journal_by_uid(uid)
-        server_journal.delete()
-        jour.models.journals.delete(flask.g.db, date)
-    return _build_monthly_calendar(date)
-
-
-@app.post('/journal/save')
-def journal_save():
-    collection = _get_caldav_collection(flask.g.db)
-    date = datetime.date.fromisoformat(flask.request.values.get('entry-date'))
-    description = flask.request.values.get('entry-text')
-    existing = jour.models.journals.get_for_date(flask.g.db, date)
-    if existing:
-        local_journal = icalendar.Calendar.from_ical(existing['journal_data'])
-        local_journal.subcomponents[0]['description'] = description
-        collection.save_journal(ical=local_journal.to_ical())
-        params = {
-            'journal_id': existing['journal_id'],
-            'journal_date': date,
-            'journal_data': local_journal.to_ical(),
-        }
-        jour.models.journals.upsert(flask.g.db, params)
-    else:
-        server_journal = collection.save_journal(dtstart=date, summary=f'Journal entry for {date}',
-                                                 description=description)
-        params = {
-            'journal_id': uuid.UUID(server_journal.id),
-            'journal_date': date,
-            'journal_data': server_journal.icalendar_instance.to_ical()
-        }
-        jour.models.journals.upsert(flask.g.db, params)
-    return _build_monthly_calendar(date)
-
-
-@app.post('/monthly/calendar')
-def monthly_calendar():
-    requested_date = datetime.date.fromisoformat(flask.request.values.get('date'))
-    return _build_monthly_calendar(requested_date)
-
-
-@app.get('/sync')
-def sync():
-    flask.g.collection = _get_caldav_collection(flask.g.db)
-    for j in flask.g.collection.journals():
-        comp = j.icalendar_instance.subcomponents[0]
-        params = {
-            'journal_id': uuid.UUID(comp['uid']),
-            'journal_date': comp['dtstart'].dt,
-            'journal_data': j.icalendar_instance.to_ical(),
-        }
-        jour.models.journals.upsert(flask.g.db, params)
-    return flask.redirect(flask.url_for('caldav_'))
-
-
 def main():
     db = _get_db()
     jour.models.init(db)
     app.secret_key = jour.models.settings.secret_key(db)
     app.add_template_filter(jour.filters.md)
+    app.add_template_global(_build_url, 'build_url')
     waitress.serve(app)

@@ -1,9 +1,11 @@
+{% extends 'base.html' %}
+
+{% block content %}
 <div class="justify-content-between pt-3 row">
     <div class="col-auto">
-        <button class="btn btn-outline-primary" hx-post="{{ url_for('monthly_calendar') }}" hx-target="#content"
-                name="date" type="button" value="{{ g.prev_month }}">
+        <a class="btn btn-outline-primary" href="{{ build_url('month', g.prev_month) }}">
             <i class="bi-chevron-left"></i>
-        </button>
+        </a>
     </div>
 
     <div class="col-auto">
@@ -12,10 +14,9 @@
 
     <div class="col-auto">
     {% if g.start < g.today.replace(day=1) %}
-        <button class="btn btn-outline-primary" hx-post="{{ url_for('monthly_calendar') }}" hx-target="#content"
-                name="date" type="button" value="{{ g.next_month }}">
+        <a class="btn btn-outline-primary" href="{{ build_url('month', g.next_month) }}">
             <i class="bi-chevron-right"></i>
-        </button>
+        </a>
     {% else %}
         <button class="btn invisible" disabled>&rarr;</button>
     {% endif %}
@@ -39,11 +40,15 @@
                     {% if d.month == g.start.month %}
                         {% if d > g.today %}
                             <td class="text-secondary">{{ d.day }}</td>
+                        {% elif d in g.dates_with_journals %}
+                            <td class="table-success">
+                                <a class="link-success text-decoration-none" href="{{ build_url('day', d) }}">
+                                    {{ d.day }}
+                                </a>
+                            </td>
                         {% else %}
-                            <td {% if d in g.dates_with_journals %}class="table-success"{% endif %}>
-                                <a class="text-decoration-none {{ 'link-success' if d in g.dates_with_journals }}"
-                                   href="#" hx-include="this" hx-post="{{ url_for('journal') }}" hx-target="#content">
-                                    <input name="date" value="{{ d }}" type="hidden">
+                            <td>
+                                <a class="text-decoration-none" href="{{ build_url('day_edit', d) }}">
                                     {{ d.day }}
                                 </a>
                             </td>
@@ -58,3 +63,4 @@
         </table>
     </div>
 </div>
+{% endblock %}

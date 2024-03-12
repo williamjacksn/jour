@@ -1,9 +1,11 @@
+{% extends 'base.html' %}
+
+{% block content %}
 <div class="justify-content-between pt-3 row">
     <div class="col-auto">
-        <button class="btn btn-outline-dark" hx-post="{{ url_for('monthly_calendar') }}" hx-target="#content"
-                name="date" type="button" value="{{ g.date }}">
+        <a class="btn btn-outline-dark" href="{{ build_url('day', g.date) }}">
             <i class="bi-chevron-left"></i>
-        </button>
+        </a>
     </div>
     <div class="col-auto">
         <h1>{{ g.date }}</h1>
@@ -17,18 +19,19 @@
 
 <div class="pt-3 row">
     <div class="col">
-        <form hx-post="{{ url_for('journal_save') }}" hx-target="#content" id="form">
-            <input name="entry-date" type="hidden" value="{{ g.date }}">
+        <form action="{{ build_url('day_update', g.date) }}"
+              id="form" method="post">
             <div class="mb-3">
                 <textarea aria-label="Journal entry" class="form-control" name="entry-text" rows="20">
                     {{- g.entry_text -}}
                 </textarea>
             </div>
             <div class="mb-3">
-                <button class="btn btn-outline-danger" hx-post="{{ url_for('journal_delete') }}" type="submit">
+                <button class="btn btn-outline-danger" formaction="{{ build_url('day_delete', g.date) }}" type="submit">
                     <i class="bi-trash"></i>
                 </button>
             </div>
         </form>
     </div>
 </div>
+{% endblock %}
