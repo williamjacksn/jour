@@ -1,0 +1,8 @@
+services:
+  jour:
+    build: .
+    image: ghcr.io/williamjacksn/jour
+    ports:
+      - 8080:8080
+    volumes:
+      - ./.local:/home/python/jour/.local
