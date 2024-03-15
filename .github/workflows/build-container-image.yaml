@@ -12,7 +12,7 @@ on:
       - published
 
 env:
-  image_name: ghcr.io/williamjacksn/jour
+  image_name: ghcr.io/${{ github.repository }}
 
 jobs:
   build:
