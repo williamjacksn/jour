@@ -46,6 +46,8 @@ notch==2023.1
     # via -r requirements.in
 pycparser==2.21
     # via cffi
+pyjwt==2.8.0
+    # via -r requirements.in
 python-dateutil==2.9.0.post0
     # via
     #   icalendar
@@ -60,7 +62,9 @@ pytz==2024.1
 recurring-ical-events==2.1.2
     # via caldav
 requests==2.31.0
-    # via caldav
+    # via
+    #   -r requirements.in
+    #   caldav
 six==1.16.0
     # via python-dateutil
 tzlocal==5.2
@@ -73,5 +77,7 @@ waitress==3.0.0
     # via -r requirements.in
 werkzeug==3.0.1
     # via flask
+whitenoise==6.6.0
+    # via -r requirements.in
 x-wr-timezone==0.0.6
     # via recurring-ical-events
