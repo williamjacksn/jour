@@ -171,7 +171,7 @@ def authorize():
         'code': flask.request.values.get('code'),
         'client_id': flask.g.settings.openid_client_id,
         'client_secret': flask.g.settings.openid_client_secret,
-        'redirect_uri': flask.url_for('authorize', _external=True),
+        'redirect_uri': flask.url_for('authorize', _external=True, _scheme=flask.g.settings.scheme),
         'grant_type': 'authorization_code'
     }
     resp = requests.post(token_endpoint, data=data).json()
@@ -224,7 +224,7 @@ def configure_credentials():
 def sign_in():
     state = str(uuid.uuid4())
     flask.session['state'] = state
-    redirect_uri = flask.url_for('authorize', _external=True)
+    redirect_uri = flask.url_for('authorize', _external=True, _scheme=flask.g.settings.scheme)
     query = {
         'client_id': flask.g.settings.openid_client_id,
         'response_type': 'code',

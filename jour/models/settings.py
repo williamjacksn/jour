@@ -108,6 +108,14 @@ class Settings:
         self.set_str('openid/discovery-document', value)
 
     @property
+    def scheme(self):
+        return self.get_str('flask/scheme')
+
+    @scheme.setter
+    def scheme(self, value):
+        self.set_str('flask/scheme', value)
+
+    @property
     def secret_key(self):
         setting_id = 'flask/secret-key'
         existing_key = self._get(setting_id)
