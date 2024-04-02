@@ -7,8 +7,9 @@
             <i class="bi-chevron-left"></i>
         </a>
     </div>
-    <div class="col-auto">
-        <h1>{{ g.date }}</h1>
+    <div class="col-auto text-center">
+        <h1>{{ g.date.day }} {{ g.date.strftime('%b %Y') }}</h1>
+        <p>{{ g.date.strftime('%A') }}</p>
     </div>
     <div class="col-auto">
         <button class="btn btn-outline-success" form="form" type="submit">
