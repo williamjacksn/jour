@@ -244,7 +244,6 @@ def main():
     static = pathlib.Path(__file__).resolve().with_name('static')
     app.wsgi_app = whitenoise.WhiteNoise(app.wsgi_app, root=static, prefix='static/')
     app.secret_key = jour.models.settings.Settings(db).secret_key
-    app.add_template_filter(jour.filters.add_css_class_to_tag)
     app.add_template_filter(jour.filters.md)
     app.add_template_global(_build_url, 'build_url')
     waitress.serve(app)
