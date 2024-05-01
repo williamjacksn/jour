@@ -20,7 +20,7 @@
 
 <div class="pt-3 row">
     <div class="col">
-        {{ g.entry_text | md }}
+        {{ g.entry_text | md | add_css_class_to_tag('blockquote', 'blockquote') }}
     </div>
 </div>
 {% endblock %}
