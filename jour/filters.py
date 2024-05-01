@@ -4,7 +4,7 @@ import markupsafe
 
 
 def add_css_class_to_tag(html: str, tag: str, css_class: str) -> markupsafe.Markup:
-    doc = lxml.html.fragment_fromstring(html)
+    doc = lxml.html.fragment_fromstring(html, create_parent='div')
     for el in doc.xpath(f'//{tag}'):
         tag.classes.add(css_class)
     result = lxml.html.tostring(doc, encoding='unicode')
