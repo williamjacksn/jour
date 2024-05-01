@@ -1,4 +1,4 @@
-import lxml
+import lxml.html
 import markdown
 import markupsafe
 
