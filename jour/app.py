@@ -77,6 +77,7 @@ def before_request():
         for k, v in flask.request.values.lists():
             app.logger.debug(f'{k}: {v}')
 
+    flask.session.permanent = True
     flask.g.db = _get_db()
     flask.g.settings = jour.models.settings.Settings(flask.g.db)
     flask.g.email = flask.session.get('email')
