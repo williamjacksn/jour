@@ -174,8 +174,14 @@ def authorize():
         'redirect_uri': flask.url_for('authorize', _external=True, _scheme=flask.g.settings.scheme),
         'grant_type': 'authorization_code'
     }
-    resp = requests.post(token_endpoint, data=data).json()
-    id_token = resp.get('id_token')
+    app.logger.debug(f'{data=}')
+    response = requests.post(token_endpoint, data=data)
+    app.logger.debug(f'{response.content=}')
+    response.raise_for_status()
+    response_data = response.json()
+    app.logger.debug(f'{response_data=}')
+    id_token = response_data.get('id_token')
+    app.logger.debug(f'{id_token=}')
     algorithms = discovery_document.get('id_token_signing_alg_values_supported')
     claim = jwt.decode(id_token, options={'verify_signature': False}, algorithms=algorithms)
     flask.session['email'] = claim.get('email')
@@ -235,6 +241,7 @@ def sign_in():
     discovery_document = requests.get(flask.g.settings.openid_discovery_document).json()
     auth_endpoint = discovery_document.get('authorization_endpoint')
     auth_url = f'{auth_endpoint}?{urllib.parse.urlencode(query)}'
+    app.logger.debug(f'Redirecting to {auth_url=}')
     return flask.redirect(auth_url, 307)
 
 
