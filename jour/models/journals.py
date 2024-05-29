@@ -42,6 +42,23 @@ def list_dates_between(db: 'fort.SQLiteDatabase', start: datetime.date, end: dat
     return [datetime.date.fromisoformat(row['journal_date']) for row in db.q(sql, params)]
 
 
+def search(db: 'fort.SQLiteDatabase', q: str, page: int = 1) -> list[dict]:
+    sql = '''
+        select
+            journal_data, journal_date, printf('%.2f', rank * -1) score,
+            snippet(journal_entries, 2, '', '', ' ... ', 16) snip
+        from journal_entries
+        where journal_entries match :q
+        order by rank, journal_id
+        limit 11 offset :offset
+    '''
+    params = {
+        'q': q,
+        'offset': 10 * (page - 1),
+    }
+    return db.q(sql, params)
+
+
 def upsert(db: 'fort.SQLiteDatabase', params: dict):
     journal_id = params.get('journal_id')
     sql = '''

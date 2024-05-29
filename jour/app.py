@@ -227,6 +227,17 @@ def configure_credentials():
     return flask.redirect(flask.url_for('index'))
 
 
+@app.post('/search')
+@login_required
+def search():
+    q = flask.request.values.get('q')
+    if q:
+        flask.g.page = int(flask.request.values.get('page', 1))
+        flask.g.results = jour.models.journals.search(flask.g.db, q, flask.g.page)
+        return flask.render_template('search.html')
+    return ''
+
+
 @app.get('/sign-in')
 def sign_in():
     state = str(uuid.uuid4())

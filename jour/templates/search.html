@@ -1,0 +1,19 @@
+{% for r in g.results %}
+    {% if loop.index < 11 %}
+    <div class="card mb-2">
+        <div class="card-body">
+            <h5 class="card-title">{{ r.journal_date }}</h5>
+            <p class="card-text">
+                <span class="badge text-bg-primary">{{ r.score }}</span>
+                {{ r.snip }}
+            </p>
+        </div>
+    </div>
+    {% else %}
+    <div hx-include="form" hx-post="{{ url_for('search', page=g.page + 1) }}" hx-trigger="revealed" hx-swap="outerHTML">
+        <span class="htmx-indicator spinner-border spinner-border-sm"></span>
+    </div>
+    {% endif %}
+{% else %}
+    no results
+{% endfor %}

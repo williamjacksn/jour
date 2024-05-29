@@ -63,4 +63,18 @@
         </table>
     </div>
 </div>
+
+<div class="pt-3 row">
+    <div class="col">
+        <form>
+            <input aria-label="Search" class="form-control" hx-post="{{ url_for('search') }}"
+                   hx-target="#search-results" hx-trigger="search, keyup changed delay:300ms" name="q"
+                   placeholder="Search..." type="search">
+        </form>
+    </div>
+</div>
+
+<div class="pt-3 row">
+    <div class="col" id="search-results"></div>
+</div>
 {% endblock %}
