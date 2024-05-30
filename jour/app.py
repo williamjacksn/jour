@@ -140,9 +140,9 @@ def day_update(year, month_, day_):
     description = flask.request.values.get('entry-text')
     existing = jour.models.journals.get_for_date(flask.g.db, d)
     if existing:
-        local_journal = icalendar.Calendar.from_ical(existing['journal_data'])
-        local_journal.subcomponents[0]['description'] = description
-        collection.save_journal(ical=local_journal.to_ical())
+        server_journal = collection.journal_by_uid(existing['journal_id'])
+        server_journal.icalendar_component['description'] = description
+        server_journal.save()
         params = {
             'journal_id': existing['journal_id'],
             'journal_date': d,
