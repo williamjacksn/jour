@@ -79,5 +79,5 @@ werkzeug==3.0.1
     # via flask
 whitenoise==6.6.0
     # via -r requirements.in
-x-wr-timezone==0.0.6
+x-wr-timezone==0.0.7
     # via recurring-ical-events
