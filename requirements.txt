@@ -71,7 +71,7 @@ tzlocal==5.2
     # via caldav
 urllib3==2.2.1
     # via requests
-vobject==0.9.6.1
+vobject==0.9.7
     # via caldav
 waitress==3.0.0
     # via -r requirements.in
