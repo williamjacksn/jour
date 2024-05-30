@@ -27,7 +27,7 @@ icalendar==5.0.11
     #   caldav
     #   recurring-ical-events
     #   x-wr-timezone
-idna==3.6
+idna==3.7
     # via requests
 itsdangerous==2.2.0
     # via flask
