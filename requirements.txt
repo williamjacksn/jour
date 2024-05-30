@@ -59,7 +59,7 @@ pytz==2024.1
     #   icalendar
     #   recurring-ical-events
     #   x-wr-timezone
-recurring-ical-events==2.1.2
+recurring-ical-events==2.2.1
     # via caldav
 requests==2.32.3
     # via
