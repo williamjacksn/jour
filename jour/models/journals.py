@@ -56,7 +56,11 @@ def search(db: 'fort.SQLiteDatabase', q: str, page: int = 1) -> list[dict]:
         'q': q,
         'offset': 10 * (page - 1),
     }
-    return db.q(sql, params)
+    return [{
+        'journal_date': datetime.date.fromisoformat(row['journal_date']),
+        'score': row['score'],
+        'snip': row['snip'],
+    } for row in db.q(sql, params)]
 
 
 def upsert(db: 'fort.SQLiteDatabase', params: dict):

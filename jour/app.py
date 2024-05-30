@@ -103,8 +103,7 @@ def day(year, month_, day_, edit=False):
     flask.g.date = datetime.date(int(year), int(month_), int(day_))
     j = jour.models.journals.get_for_date(flask.g.db, flask.g.date)
     if j:
-        parsed = icalendar.Calendar.from_ical(j['journal_data'])
-        flask.g.entry_text = parsed.subcomponents[0]['description']
+        flask.g.entry_text = j['journal_data']
     else:
         flask.g.entry_text = ''
     if edit:
@@ -147,7 +146,7 @@ def day_update(year, month_, day_):
         params = {
             'journal_id': existing['journal_id'],
             'journal_date': d,
-            'journal_data': local_journal.to_ical(),
+            'journal_data': description,
         }
         jour.models.journals.upsert(flask.g.db, params)
     else:
@@ -156,7 +155,7 @@ def day_update(year, month_, day_):
         params = {
             'journal_id': uuid.UUID(server_journal.id),
             'journal_date': d,
-            'journal_data': server_journal.icalendar_instance.to_ical(),
+            'journal_data': description,
         }
         jour.models.journals.upsert(flask.g.db, params)
     return flask.redirect(_build_url('day', d))
@@ -201,11 +200,11 @@ def caldav_():
 def caldav_sync():
     flask.g.collection = _get_caldav_collection()
     for j in flask.g.collection.journals():
-        comp = j.icalendar_instance.subcomponents[0]
+        comp = j.icalendar_component
         params = {
             'journal_id': uuid.UUID(comp['uid']),
             'journal_date': comp['dtstart'].dt,
-            'journal_data': j.icalendar_instance.to_ical(),
+            'journal_data': j.icalendar_component['description'],
         }
         jour.models.journals.upsert(flask.g.db, params)
     return flask.redirect(flask.url_for('caldav_'))
