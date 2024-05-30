@@ -2,9 +2,18 @@
     {% if loop.index < 11 %}
     <div class="card mb-2">
         <div class="card-body">
-            <h5 class="card-title">{{ r.journal_date }} / {{ r.journal_date.strftime('%A') }}</h5>
+            <div class="row">
+                <div class="col-auto">
+                    <h5 class="card-title">
+                        {{ r.journal_date }}
+                        <small class="text-body-secondary">/ {{ r.journal_date.strftime('%A') }}</small>
+                    </h5>
+                </div>
+                <div class="col-auto ms-auto">
+                    <span class="badge text-bg-primary">{{ r.score }}</span>
+                </div>
+            </div>
             <p class="card-text">
-                <span class="badge text-bg-primary">{{ r.score }}</span>
                 {{ r.snip }}
                 <a class="stretched-link"
                    href="{{ url_for('day', year=r.journal_date.year, month_=r.journal_date.month, day_=r.journal_date.day) }}"></a>
