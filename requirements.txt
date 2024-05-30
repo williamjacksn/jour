@@ -75,7 +75,7 @@ vobject==0.9.7
     # via caldav
 waitress==3.0.0
     # via -r requirements.in
-werkzeug==3.0.1
+werkzeug==3.0.3
     # via flask
 whitenoise==6.6.0
     # via -r requirements.in
