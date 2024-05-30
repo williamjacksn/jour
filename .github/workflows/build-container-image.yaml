@@ -36,12 +36,15 @@ jobs:
       - name: Build the container image
         uses: docker/build-push-action@v5
         with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: ${{ env.image_name }}
 
       - name: Push latest image to registry
         if: github.event_name == 'push'
         uses: docker/build-push-action@v5
         with:
+          cache-from: type=gha
           push: true
           tags: ${{ env.image_name }}:latest
 
@@ -49,5 +52,6 @@ jobs:
         if: github.event_name == 'release'
         uses: docker/build-push-action@v5
         with:
+          cache-from: type=gha
           push: true
           tags: ${{ env.image_name }}:latest,${{ env.image_name }}:${{ github.event.release.tag_name }}
