@@ -69,7 +69,7 @@ six==1.16.0
     # via python-dateutil
 tzlocal==5.2
     # via caldav
-urllib3==2.2.1
+urllib3==2.2.2
     # via requests
 vobject==0.9.7
     # via caldav
