@@ -57,9 +57,8 @@ pytz==2024.1
     # via
     #   caldav
     #   icalendar
-    #   recurring-ical-events
     #   x-wr-timezone
-recurring-ical-events==2.2.1
+recurring-ical-events==2.2.2
     # via caldav
 requests==2.32.3
     # via
@@ -67,6 +66,8 @@ requests==2.32.3
     #   caldav
 six==1.16.0
     # via python-dateutil
+tzdata==2024.1
+    # via recurring-ical-events
 tzlocal==5.2
     # via caldav
 urllib3==2.2.2
