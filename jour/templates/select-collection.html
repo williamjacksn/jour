@@ -1,9 +1,0 @@
-<form action="{{ url_for('configure_collection') }}" method="post">
-    <label for="caldav-collection-url">Select a CalDAV collection to use</label>
-    <select id="caldav-collection-url" name="caldav-collection-url">
-    {% for c in g.caldav_principal.calendars() %}
-        <option value="{{ c.url }}">{{ c.name }}</option>
-    {% endfor %}
-    </select>
-    <button type="submit">Submit</button>
-</form>
