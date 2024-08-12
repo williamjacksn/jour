@@ -6,8 +6,6 @@
 #
 blinker==1.8.2
     # via flask
-caldav==1.3.9
-    # via -r requirements.in
 certifi==2024.7.4
     # via requests
 cffi==1.17.0
@@ -22,19 +20,12 @@ flask==3.0.3
     # via -r requirements.in
 fort==2024.2
     # via -r requirements.in
-icalendar==5.0.13
-    # via
-    #   caldav
-    #   recurring-ical-events
-    #   x-wr-timezone
 idna==3.7
     # via requests
 itsdangerous==2.2.0
     # via flask
 jinja2==3.1.4
     # via flask
-lxml==5.3.0
-    # via caldav
 markdown==3.6
     # via -r requirements.in
 markupsafe==2.1.5
@@ -48,37 +39,13 @@ pycparser==2.22
     # via cffi
 pyjwt==2.9.0
     # via -r requirements.in
-python-dateutil==2.9.0.post0
-    # via
-    #   icalendar
-    #   recurring-ical-events
-    #   vobject
-pytz==2024.1
-    # via
-    #   caldav
-    #   icalendar
-    #   x-wr-timezone
-recurring-ical-events==2.2.3
-    # via caldav
 requests==2.32.3
-    # via
-    #   -r requirements.in
-    #   caldav
-six==1.16.0
-    # via python-dateutil
-tzdata==2024.1
-    # via recurring-ical-events
-tzlocal==5.2
-    # via caldav
+    # via -r requirements.in
 urllib3==2.2.2
     # via requests
-vobject==0.9.7
-    # via caldav
 waitress==3.0.0
     # via -r requirements.in
 werkzeug==3.0.3
     # via flask
 whitenoise==6.7.0
     # via -r requirements.in
-x-wr-timezone==0.0.7
-    # via recurring-ical-events

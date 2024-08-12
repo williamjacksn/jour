@@ -1,10 +1,8 @@
-import caldav
 import calendar
 import datetime
 import flask
 import fort
 import functools
-import icalendar
 import jour.filters
 import jour.models
 import jwt
@@ -39,18 +37,6 @@ def _build_url(endpoint: str, d: datetime.date):
         return flask.url_for(endpoint, year=year, month_=month_)
     if endpoint in ['day', 'day_delete', 'day_edit', 'day_update']:
         return flask.url_for(endpoint, year=year, month_=month_, day_=day_)
-
-
-def _get_caldav_client():
-    caldav_url = flask.g.settings.caldav_url
-    caldav_username = flask.g.settings.caldav_username
-    caldav_password = flask.g.settings.caldav_password
-    return caldav.DAVClient(url=caldav_url, username=caldav_username, password=caldav_password)
-
-
-def _get_caldav_collection():
-    client = _get_caldav_client()
-    return client.calendar(url=flask.g.settings.caldav_collection_url)
 
 
 def _get_db() -> fort.SQLiteDatabase:
@@ -115,13 +101,9 @@ def day(year, month_, day_, edit=False):
 @app.post('/<year>/<month_>/<day_>/delete')
 @login_required
 def day_delete(year, month_, day_):
-    collection = _get_caldav_collection()
     d = datetime.date(int(year), int(month_), int(day_))
     existing = jour.models.journals.get_for_date(flask.g.db, d)
     if existing:
-        uid = str(existing['journal_id'])
-        server_journal = collection.journal_by_uid(uid)
-        server_journal.delete()
         jour.models.journals.delete(flask.g.db, d)
     return flask.redirect(_build_url('month', d))
 
@@ -135,29 +117,22 @@ def day_edit(year, month_, day_):
 @app.post('/<year>/<month_>/<day_>/update')
 @login_required
 def day_update(year, month_, day_):
-    collection = _get_caldav_collection()
     d = datetime.date(int(year), int(month_), int(day_))
     description = flask.request.values.get('entry-text')
     existing = jour.models.journals.get_for_date(flask.g.db, d)
     if existing:
-        server_journal = collection.journal_by_uid(existing['journal_id'])
-        server_journal.icalendar_component['description'] = description
-        server_journal.save()
         params = {
             'journal_id': existing['journal_id'],
             'journal_date': d,
             'journal_data': description,
         }
-        jour.models.journals.upsert(flask.g.db, params)
     else:
-        summary = f'Journal entry for {d}'
-        server_journal = collection.save_journal(dtstart=d, summary=summary, description=description)
         params = {
-            'journal_id': uuid.UUID(server_journal.id),
+            'journal_id': uuid.uuid4(),
             'journal_date': d,
             'journal_data': description,
         }
-        jour.models.journals.upsert(flask.g.db, params)
+    jour.models.journals.upsert(flask.g.db, params)
     return flask.redirect(_build_url('day', d))
 
 
@@ -185,44 +160,6 @@ def authorize():
     algorithms = discovery_document.get('id_token_signing_alg_values_supported')
     claim = jwt.decode(id_token, options={'verify_signature': False}, algorithms=algorithms)
     flask.session['email'] = claim.get('email')
-    return flask.redirect(flask.url_for('index'))
-
-
-@app.get('/caldav')
-@login_required
-def caldav_():
-    flask.g.collection = _get_caldav_collection()
-    return flask.render_template('caldav.html')
-
-
-@app.get('/caldav/sync')
-@login_required
-def caldav_sync():
-    flask.g.collection = _get_caldav_collection()
-    for j in flask.g.collection.journals():
-        comp = j.icalendar_component
-        params = {
-            'journal_id': uuid.UUID(comp['uid']),
-            'journal_date': comp['dtstart'].dt,
-            'journal_data': j.icalendar_component['description'],
-        }
-        jour.models.journals.upsert(flask.g.db, params)
-    return flask.redirect(flask.url_for('caldav_'))
-
-
-@app.post('/configure/collection')
-@login_required
-def configure_collection():
-    flask.g.settings.caldav_collection_url = flask.request.values.get('caldav-collection-url')
-    return flask.redirect(flask.url_for('index'))
-
-
-@app.post('/configure/credentials')
-@login_required
-def configure_credentials():
-    flask.g.settings.caldav_url = flask.request.values.get('caldav-url')
-    flask.g.settings.caldav_username = flask.request.values.get('caldav-username')
-    flask.g.settings.caldav_password = flask.request.values.get('caldav-password')
     return flask.redirect(flask.url_for('index'))
 
 
