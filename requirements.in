@@ -1,6 +1,7 @@
 cryptography
 flask
 fort
+lxml
 markdown
 markupsafe
 notch
