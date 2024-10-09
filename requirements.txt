@@ -30,7 +30,7 @@ lxml==5.3.0
     # via -r requirements.in
 markdown==3.7
     # via -r requirements.in
-markupsafe==3.0.0
+markupsafe==3.0.1
     # via
     #   -r requirements.in
     #   jinja2
