@@ -49,5 +49,5 @@ waitress==3.0.1
     # via -r requirements.in
 werkzeug==3.0.6
     # via flask
-whitenoise==6.8.1
+whitenoise==6.8.2
     # via -r requirements.in
