@@ -7,6 +7,15 @@ services:
     volumes:
       - ./.local:/home/python/jour/.local
 
+  pip-compile:
+    entrypoint:
+      - /home/python/venv/bin/pip-compile
+    image: ghcr.io/williamjacksn/pip-tools:py3.13
+    init: true
+    volumes:
+      - ./:/home/python/jour
+    working_dir: /home/python/jour
+
   shell:
     entrypoint:
       - /bin/bash
