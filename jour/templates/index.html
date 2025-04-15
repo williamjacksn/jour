@@ -1,7 +1,0 @@
-{% extends 'base.html' %}
-
-{% block content %}
-    <div hx-include="this" hx-post="{{ url_for('monthly_calendar') }}" hx-trigger="load" id="content">
-        <input name="date" type="hidden" value="{{ g.today }}">
-    </div>
-{% endblock %}

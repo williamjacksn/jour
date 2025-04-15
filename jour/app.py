@@ -3,7 +3,7 @@ import datetime
 import flask
 import fort
 import functools
-import jour.filters
+import jour.components
 import jour.models
 import jwt
 import pathlib
@@ -17,28 +17,10 @@ app = flask.Flask(__name__)
 
 
 def _build_month(date: datetime.date):
-    flask.g.start = date.replace(day=1)
-    flask.g.end = date.replace(day=calendar.monthrange(date.year, date.month)[1])
-    flask.g.dates_with_journals = jour.models.journals.list_dates_between(
-        flask.g.db, flask.g.start, flask.g.end
-    )
-    flask.g.today = datetime.date.today()
-    flask.g.month_name = calendar.month_name[flask.g.start.month]
-    flask.g.cal = calendar.Calendar(firstweekday=calendar.SUNDAY)
-    flask.g.day_names = (calendar.day_name[i][0:2] for i in flask.g.cal.iterweekdays())
-    flask.g.prev_month = flask.g.start - datetime.timedelta(days=1)
-    flask.g.next_month = flask.g.start + datetime.timedelta(days=31)
-    return flask.render_template("month.html")
-
-
-def _build_url(endpoint: str, d: datetime.date):
-    year = d.year
-    month_ = d.strftime("%m")
-    day_ = d.strftime("%d")
-    if endpoint in ["month"]:
-        return flask.url_for(endpoint, year=year, month_=month_)
-    if endpoint in ["day", "day_delete", "day_edit", "day_update"]:
-        return flask.url_for(endpoint, year=year, month_=month_, day_=day_)
+    start = date.replace(day=1)
+    end = date.replace(day=calendar.monthrange(date.year, date.month)[1])
+    dwj = jour.models.journals.list_dates_between(flask.g.db, start, end)
+    return jour.components.month(date, dwj)
 
 
 def _get_db() -> fort.SQLiteDatabase:
@@ -54,7 +36,7 @@ def login_required(f):
             return flask.redirect(flask.url_for("sign_in"))
         if flask.g.email == flask.g.settings.user_email:
             return f(*args, **kwargs)
-        return flask.render_template("not-authorized.html")
+        return jour.components.not_authorized()
 
     return decorated_function
 
@@ -76,7 +58,7 @@ def before_request():
 @login_required
 def index():
     d = datetime.date.today()
-    return flask.redirect(_build_url("month", d))
+    return flask.redirect(jour.components.build_url("month", d))
 
 
 @app.get("/<year>/<month_>")
@@ -89,16 +71,16 @@ def month(year, month_):
 @app.get("/<year>/<month_>/<day_>")
 @login_required
 def day(year, month_, day_, edit=False):
-    flask.g.date = datetime.date(int(year), int(month_), int(day_))
-    j = jour.models.journals.get_for_date(flask.g.db, flask.g.date)
+    date = datetime.date(int(year), int(month_), int(day_))
+    j = jour.models.journals.get_for_date(flask.g.db, date)
     if j:
-        flask.g.entry_text = j["journal_data"]
+        entry_text = j["journal_data"]
     else:
-        flask.g.entry_text = ""
+        entry_text = ""
     if edit:
-        return flask.render_template("day-edit.html")
+        return jour.components.day_edit(date, entry_text)
     else:
-        return flask.render_template("day.html")
+        return jour.components.day(date, entry_text)
 
 
 @app.post("/<year>/<month_>/<day_>/delete")
@@ -108,7 +90,7 @@ def day_delete(year, month_, day_):
     existing = jour.models.journals.get_for_date(flask.g.db, d)
     if existing:
         jour.models.journals.delete(flask.g.db, d)
-    return flask.redirect(_build_url("month", d))
+    return flask.redirect(jour.components.build_url("month", d))
 
 
 @app.get("/<year>/<month_>/<day_>/edit")
@@ -136,7 +118,7 @@ def day_update(year, month_, day_):
             "journal_data": description,
         }
     jour.models.journals.upsert(flask.g.db, params)
-    return flask.redirect(_build_url("day", d))
+    return flask.redirect(jour.components.build_url("day", d))
 
 
 @app.get("/authorize")
@@ -175,9 +157,9 @@ def authorize():
 def search():
     q = flask.request.values.get("q")
     if q:
-        flask.g.page = int(flask.request.values.get("page", 1))
-        flask.g.results = jour.models.journals.search(flask.g.db, q, flask.g.page)
-        return flask.render_template("search.html")
+        page = int(flask.request.values.get("page", 1))
+        results = jour.models.journals.search(flask.g.db, q, page)
+        return jour.components.search(results, page)
     return ""
 
 
@@ -208,6 +190,4 @@ def main():
     static = pathlib.Path(__file__).resolve().with_name("static")
     app.wsgi_app = whitenoise.WhiteNoise(app.wsgi_app, root=static, prefix="static/")
     app.secret_key = jour.models.settings.Settings(db).secret_key
-    app.add_template_filter(jour.filters.md)
-    app.add_template_global(_build_url, "build_url")
     waitress.serve(app)
