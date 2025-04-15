@@ -80,7 +80,7 @@ def day(date: datetime.date, entry_text: str) -> str:
         ],
         htpy.div(".pt-3.row")[htpy.div(".col")[_md(entry_text)]],
     ]
-    return htpy.render_node(_base(content))
+    return str(_base(content))
 
 
 def day_edit(date: datetime.date, entry_text: str) -> str:
@@ -122,7 +122,7 @@ def day_edit(date: datetime.date, entry_text: str) -> str:
             ]
         ],
     ]
-    return htpy.render_node(_base(content))
+    return str(_base(content))
 
 
 def month(date: datetime.date, dates_with_journals: list[datetime.date]) -> str:
@@ -206,12 +206,12 @@ def month(date: datetime.date, dates_with_journals: list[datetime.date]) -> str:
         ],
         htpy.div(".pt-3.row")[htpy.div("#search-results.col")],
     ]
-    return htpy.render_node(_base(content))
+    return str(_base(content))
 
 
 def not_authorized() -> str:
     content = htpy.div(".pt-3.row")[htpy.div(".col")[htpy.h1["Not authorized"]]]
-    return htpy.render_node(_base(content))
+    return str(_base(content))
 
 
 def search(results: list[dict], page: int) -> str:
@@ -255,4 +255,4 @@ def search(results: list[dict], page: int) -> str:
             )
     if not content:
         content.append("no results")
-    return htpy.render_node(content)
+    return str(content)
