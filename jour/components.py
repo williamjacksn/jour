@@ -255,4 +255,4 @@ def search(results: list[dict], page: int) -> str:
             )
     if not content:
         content.append("no results")
-    return str(content)
+    return str(htpy.fragment(content))
