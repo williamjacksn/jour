@@ -94,7 +94,7 @@ def day_edit(date: datetime.date, entry_text: str) -> str:
             htpy.div(".col-auto.text-center")[
                 htpy.h1[date.day, date.strftime(" %b %Y")], htpy.p[date.strftime("%A")]
             ],
-            htpy.div("col-auto")[
+            htpy.div(".col-auto")[
                 htpy.button(".btn.btn-outline-success", form="form", type="submit")[
                     htpy.i(".bi-check-lg")
                 ]
