@@ -69,7 +69,7 @@ def day(date: datetime.date, entry_text: str) -> str:
                     htpy.i(".bi-chevron-left")
                 ]
             ],
-            htpy.div("col-auto.text-center")[
+            htpy.div(".col-auto.text-center")[
                 htpy.h1[date.day, date.strftime(" %b %Y")], htpy.p[date.strftime("%A")]
             ],
             htpy.div(".col-auto")[
