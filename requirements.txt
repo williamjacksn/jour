@@ -16,7 +16,7 @@ click==8.2.0
     # via flask
 cryptography==44.0.3
     # via -r requirements.in
-flask==3.1.0
+flask==3.1.1
     # via -r requirements.in
 fort==2025.0
     # via -r requirements.in
@@ -35,6 +35,7 @@ markdown==3.8
 markupsafe==3.0.2
     # via
     #   -r requirements.in
+    #   flask
     #   htpy
     #   jinja2
     #   werkzeug
