@@ -5,16 +5,7 @@ services:
     ports:
       - 8080:8080
     volumes:
-      - ./.local:/home/python/jour/.local
-
-  pip-compile:
-    entrypoint:
-      - /home/python/venv/bin/pip-compile
-    image: ghcr.io/williamjacksn/pip-tools:py3.13
-    init: true
-    volumes:
-      - ./:/home/python/jour
-    working_dir: /home/python/jour
+      - ./.local:/app/.local
 
   shell:
     entrypoint:
@@ -22,4 +13,4 @@ services:
     image: ghcr.io/williamjacksn/jour
     init: true
     volumes:
-      - ./:/home/python/jour
+      - ./:/app

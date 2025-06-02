@@ -1,0 +1,20 @@
+[project]
+name = "jour"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography>=44.0.2",
+    "flask>=3.1.0",
+    "fort>=2024.2",
+    "htpy>=25.4.0",
+    "lxml>=5.3.2",
+    "markdown>=3.7",
+    "markupsafe>=3.0.2",
+    "notch>=2023.1",
+    "pyjwt>=2.10.1",
+    "requests>=2.32.3",
+    "waitress>=3.0.2",
+    "whitenoise>=6.9.0",
+]
