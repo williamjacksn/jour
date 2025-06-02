@@ -5,7 +5,7 @@ USER python
 
 WORKDIR /app
 COPY --chown=python:python .python-version pyproject.toml uv.lock ./
-RUN /usr/local/bin/uv sync ---frozen
+RUN /usr/local/bin/uv sync --frozen
 
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE="1" \
