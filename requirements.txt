@@ -20,7 +20,7 @@ flask==3.1.1
     # via -r requirements.in
 fort==2025.0
     # via -r requirements.in
-htpy==25.5.0
+htpy==25.6.2
     # via -r requirements.in
 idna==3.10
     # via requests
