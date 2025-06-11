@@ -7,6 +7,8 @@ import lxml.html
 import markdown
 import markupsafe
 
+import jour.versions as v
+
 
 def _base(content: htpy.Node) -> htpy.Node:
     return htpy.html(lang="en")[
@@ -18,11 +20,11 @@ def _base(content: htpy.Node) -> htpy.Node:
             ),
             htpy.title["Jour"],
             htpy.link(
-                href=flask.url_for("static", filename="bootstrap-5.3.3.css"),
+                href=flask.url_for("static", filename=f"bootstrap-{v.bs}.css"),
                 rel="stylesheet",
             ),
             htpy.link(
-                href=flask.url_for("static", filename="bootstrap-icons-1.11.3.css"),
+                href=flask.url_for("static", filename=f"bootstrap-icons-{v.bi}.css"),
                 rel="stylesheet",
             ),
         ],
@@ -35,9 +37,9 @@ def _base(content: htpy.Node) -> htpy.Node:
                 ]
             ],
             htpy.script(
-                src=flask.url_for("static", filename="bootstrap-5.3.3.bundle.js")
+                src=flask.url_for("static", filename=f"bootstrap-{v.bs}.bundle.js")
             ),
-            htpy.script(src=flask.url_for("static", filename="htmx-1.9.10.js")),
+            htpy.script(src=flask.url_for("static", filename=f"htmx-{v.hx}.js")),
         ],
     ]
 
