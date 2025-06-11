@@ -1,17 +1,19 @@
 import calendar
 import datetime
-import flask
-import fort
 import functools
-import jour.components
-import jour.models
-import jwt
 import pathlib
-import requests
 import urllib.parse
 import uuid
+
+import flask
+import fort
+import jwt
+import requests
 import waitress
 import whitenoise
+
+import jour.components
+import jour.models
 
 app = flask.Flask(__name__)
 

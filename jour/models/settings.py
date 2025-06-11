@@ -1,5 +1,6 @@
-import cryptography.fernet
 import typing
+
+import cryptography.fernet
 
 if typing.TYPE_CHECKING:
     import fort

@@ -1,6 +1,6 @@
-from . import settings, journals
-
 import typing
+
+from . import journals, settings
 
 if typing.TYPE_CHECKING:
     import fort
