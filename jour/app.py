@@ -154,6 +154,11 @@ def authorize():
     return flask.redirect(flask.url_for("index"))
 
 
+@app.get("/favicon.svg")
+def favicon():
+    return flask.Response(jour.components.favicon(), mimetype="image/svg+xml")
+
+
 @app.post("/search")
 @login_required
 def search():
