@@ -13,11 +13,11 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     TZ="America/Chicago"
 
 LABEL org.opencontainers.image.authors="William Jackson <william@subtlecoolness.com>" \
-      org.opencontainers.image.description="Journal" \
-      org.opencontainers.image.source="https://github.com/williamjacksn/jour" \
-      org.opencontainers.image.title="Jour"
+    org.opencontainers.image.description="Journal" \
+    org.opencontainers.image.source="https://github.com/williamjacksn/jour" \
+    org.opencontainers.image.title="Jour"
 
-COPY --chown=python:python run.py ./
+COPY --chown=python:python package.json run.py ./
 COPY --chown=python:python jour ./jour
 
 ENTRYPOINT ["/usr/local/bin/uv", "run", "run.py"]
