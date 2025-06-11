@@ -130,6 +130,7 @@ def day_edit(date: datetime.date, entry_text: str) -> str:
 
 
 def favicon() -> str:
+    # https://icons.getbootstrap.com/icons/journal-bookmark-fill/
     content = htpy.svg(
         ".bi.bi-journal-bookmark-fill",
         fill="#146c43",
