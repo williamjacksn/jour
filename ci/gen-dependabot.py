@@ -10,7 +10,7 @@ def update(ecosystem: str) -> dict:
     }
 
 
-ecosystems = ["docker", "github-actions", "uv"]
+ecosystems = ["docker", "github-actions", "npm", "uv"]
 content = {
     "version": 2,
     "updates": [update(e) for e in ecosystems],
