@@ -7,8 +7,8 @@ import uuid
 
 import flask
 import fort
+import httpx
 import jwt
-import requests
 import waitress
 import whitenoise
 
@@ -127,7 +127,7 @@ def day_update(year, month_, day_):
 def authorize():
     if flask.session.get("state") != flask.request.values.get("state"):
         return "State mismatch", 401
-    discovery_document = requests.get(flask.g.settings.openid_discovery_document).json()
+    discovery_document = httpx.get(flask.g.settings.openid_discovery_document).json()
     token_endpoint = discovery_document.get("token_endpoint")
     data = {
         "code": flask.request.values.get("code"),
@@ -139,7 +139,7 @@ def authorize():
         "grant_type": "authorization_code",
     }
     app.logger.debug(f"{data=}")
-    response = requests.post(token_endpoint, data=data)
+    response = httpx.post(token_endpoint, data=data)
     app.logger.debug(f"{response.content=}")
     response.raise_for_status()
     response_data = response.json()
@@ -179,7 +179,7 @@ def sign_in():
         "redirect_uri": redirect_uri,
         "state": state,
     }
-    discovery_document = requests.get(flask.g.settings.openid_discovery_document).json()
+    discovery_document = httpx.get(flask.g.settings.openid_discovery_document).json()
     auth_endpoint = discovery_document.get("authorization_endpoint")
     auth_url = f"{auth_endpoint}?{urllib.parse.urlencode(query)}"
     app.logger.debug(f"Redirecting to {auth_url=}")
