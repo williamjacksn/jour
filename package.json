@@ -1,11 +1,11 @@
 {
-    "name": "jour",
-    "version": "1.0.0",
-    "license": "UNLICENSED",
-    "private": true,
-    "dependencies": {
-        "bootstrap": "5.3.3",
-        "bootstrap-icons": "1.11.3",
-        "htmx.org": "1.9.10"
-    }
+  "dependencies": {
+    "bootstrap": "5.3.3",
+    "bootstrap-icons": "1.11.3",
+    "htmx.org": "1.9.10"
+  },
+  "license": "UNLICENSED",
+  "name": "jour",
+  "private": true,
+  "version": "1.0.0"
 }
