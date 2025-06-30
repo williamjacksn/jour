@@ -163,6 +163,13 @@ def favicon() -> str:
     return str(content)
 
 
+def knock() -> str:
+    content = htpy.form(method="post")[
+        input(".form-control", name="pw", type="password")
+    ]
+    return str(_base(content))
+
+
 def month(date: datetime.date, dates_with_journals: list[datetime.date]) -> str:
     start = date.replace(day=1)
     prev_month = start - datetime.timedelta(days=1)
