@@ -21,7 +21,7 @@ def _base(content: htpy.Node) -> htpy.Node:
             htpy.title["Jour"],
             htpy.link(href=flask.url_for("favicon"), rel="icon"),
             htpy.link(
-                href=flask.url_for("static", filename=f"bootstrap-{v.bs}.css"),
+                href=f"https://cdn.jsdelivr.net/npm/bootstrap@{v.bs}/dist/css/bootstrap.min.css",
                 rel="stylesheet",
             ),
             htpy.link(
@@ -38,7 +38,7 @@ def _base(content: htpy.Node) -> htpy.Node:
                 ]
             ],
             htpy.script(
-                src=flask.url_for("static", filename=f"bootstrap-{v.bs}.bundle.js")
+                src=f"https://cdn.jsdelivr.net/npm/bootstrap@{v.bs}/dist/js/bootstrap.bundle.min.js"
             ),
             htpy.script(
                 src=f"https://cdn.jsdelivr.net/npm/htmx.org@{v.hx}/dist/htmx.js"
