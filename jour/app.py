@@ -159,15 +159,15 @@ def favicon():
     return flask.Response(jour.components.favicon(), mimetype="image/svg+xml")
 
 
-@app.route("/knock", methods=["GET", "POST"])
-def knock():
-    if flask.request.method == "GET":
-        return jour.components.knock()
-    pw = flask.request.values.get("pw")
-    if pw == flask.g.settings.openid_client_id:
-        flask.session["email"] = flask.g.settings.user_email
-        return flask.redirect(flask.url_for("index"))
-    return flask.redirect(flask.url_for("knock"))
+# @app.route("/knock", methods=["GET", "POST"])
+# def knock():
+#     if flask.request.method == "GET":
+#         return jour.components.knock()
+#     pw = flask.request.values.get("pw")
+#     if pw == flask.g.settings.openid_client_id:
+#         flask.session["email"] = flask.g.settings.user_email
+#         return flask.redirect(flask.url_for("index"))
+#     return flask.redirect(flask.url_for("knock"))
 
 
 @app.post("/search")
