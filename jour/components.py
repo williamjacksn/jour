@@ -165,7 +165,7 @@ def favicon() -> str:
 
 def knock() -> str:
     content = htpy.form(method="post")[
-        input(".form-control", name="pw", type="password")
+        htpy.input(".form-control", name="pw", type="password")
     ]
     return str(_base(content))
 
