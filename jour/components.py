@@ -25,7 +25,7 @@ def _base(content: htpy.Node) -> htpy.Node:
                 rel="stylesheet",
             ),
             htpy.link(
-                href=flask.url_for("static", filename=f"bootstrap-icons-{v.bi}.css"),
+                href=f"https://cdn.jsdelivr.net/npm/bootstrap-icons@{v.bi}/font/bootstrap-icons.min.css",
                 rel="stylesheet",
             ),
         ],
