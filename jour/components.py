@@ -40,7 +40,9 @@ def _base(content: htpy.Node) -> htpy.Node:
             htpy.script(
                 src=flask.url_for("static", filename=f"bootstrap-{v.bs}.bundle.js")
             ),
-            htpy.script(src=flask.url_for("static", filename=f"htmx-{v.hx}.js")),
+            htpy.script(
+                src=f"https://cdn.jsdelivr.net/npm/htmx.org@{v.hx}/dist/htmx.js"
+            ),
         ],
     ]
 
