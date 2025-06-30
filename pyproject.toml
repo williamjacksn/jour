@@ -16,5 +16,4 @@ dependencies = [
     "notch>=2023.1",
     "pyjwt>=2.10.1",
     "waitress>=3.0.2",
-    "whitenoise>=6.9.0",
 ]

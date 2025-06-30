@@ -10,7 +10,6 @@ import fort
 import httpx
 import jwt
 import waitress
-import whitenoise
 
 import jour.components
 import jour.models
@@ -205,7 +204,5 @@ def sign_in():
 def main():
     db = _get_db()
     jour.models.init(db)
-    static = pathlib.Path(__file__).resolve().with_name("static")
-    app.wsgi_app = whitenoise.WhiteNoise(app.wsgi_app, root=static, prefix="static/")
     app.secret_key = jour.models.settings.Settings(db).secret_key
     waitress.serve(app)
