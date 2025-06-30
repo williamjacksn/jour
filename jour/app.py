@@ -167,6 +167,7 @@ def knock():
     if pw == flask.g.settings.openid_client_id:
         flask.session["email"] = flask.g.settings.user_email
         return flask.redirect(flask.url_for("index"))
+    return flask.redirect(flask.url_for("knock"))
 
 
 @app.post("/search")
