@@ -8,7 +8,7 @@ package_json = {
     "private": True,
     "dependencies": {
         "bootstrap": "5.3.3",
-        "bootstrap-icons": "1.11.3",
+        "bootstrap-icons": "1.13.1",
         "htmx.org": "2.0.6",
     },
 }
