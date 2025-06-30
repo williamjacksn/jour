@@ -9,7 +9,7 @@ package_json = {
     "dependencies": {
         "bootstrap": "5.3.3",
         "bootstrap-icons": "1.11.3",
-        "htmx.org": "1.9.10",
+        "htmx.org": "2.0.6",
     },
 }
 
