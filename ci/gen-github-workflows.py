@@ -16,6 +16,7 @@ workflow = {
         "_workflow_file_generator": "ci/gen-github-workflows.py",
         "image_name": "ghcr.io/${{ github.repository }}",
     },
+    "concurrency": {"group": "build-and-deploy"},
     "jobs": {
         "build": {
             "name": "Build the container image",

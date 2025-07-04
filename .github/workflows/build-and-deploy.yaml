@@ -1,4 +1,7 @@
 {
+  "concurrency": {
+    "group": "build-and-deploy"
+  },
   "env": {
     "_workflow_file_generator": "ci/gen-github-workflows.py",
     "image_name": "ghcr.io/${{ github.repository }}"
