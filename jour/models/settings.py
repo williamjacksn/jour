@@ -61,8 +61,8 @@ class Settings:
         self.set_str("openid/client-id", value)
 
     @property
-    def openid_client_secret(self):
-        return self.get_enc("openid/client-secret")
+    def openid_client_secret(self) -> str:
+        return self.get_enc("openid/client-secret").decode()
 
     @openid_client_secret.setter
     def openid_client_secret(self, value):
