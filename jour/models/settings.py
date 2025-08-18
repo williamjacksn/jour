@@ -32,38 +32,6 @@ class Settings:
         }
         self.db.u(sql, params)
 
-    @property
-    def caldav_collection_url(self):
-        return self.get_str("caldav/collection-url")
-
-    @caldav_collection_url.setter
-    def caldav_collection_url(self, value):
-        self.set_str("caldav/collection-url", value)
-
-    @property
-    def caldav_password(self):
-        return self.get_enc("caldav/password")
-
-    @caldav_password.setter
-    def caldav_password(self, value):
-        self.set_enc("caldav/password", value)
-
-    @property
-    def caldav_url(self):
-        return self.get_str("caldav/url")
-
-    @caldav_url.setter
-    def caldav_url(self, value):
-        self.set_str("caldav/url", value)
-
-    @property
-    def caldav_username(self):
-        return self.get_str("caldav/username")
-
-    @caldav_username.setter
-    def caldav_username(self, value):
-        self.set_str("caldav/username", value)
-
     def get_enc(self, setting_id: str):
         val = self._get(setting_id)
         if val:
