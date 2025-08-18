@@ -17,7 +17,7 @@ LABEL org.opencontainers.image.authors="William Jackson <william@subtlecoolness.
     org.opencontainers.image.source="https://github.com/williamjacksn/jour" \
     org.opencontainers.image.title="Jour"
 
-COPY --chown=python:python package.json run.py ./
+COPY --chown=python:python cli.py package.json run.py ./
 COPY --chown=python:python jour ./jour
 
 ENTRYPOINT ["uv", "run", "run.py"]
