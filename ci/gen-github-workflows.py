@@ -64,7 +64,7 @@ workflow = {
             "if": push_or_dispatch,
             "runs-on": "ubuntu-latest",
             "steps": [
-                {"name": "Check out the repository", "uses": "actions/checkout@v4"},
+                {"name": "Check out the repository", "uses": "actions/checkout@v5"},
                 {
                     "name": "Deploy the app",
                     "run": "sh ci/ssh-deploy.sh",
@@ -93,7 +93,7 @@ ruff = {
             "name": "Run ruff linting and formatting checks",
             "runs-on": "ubuntu-latest",
             "steps": [
-                {"name": "Check out repository", "uses": "actions/checkout@v4"},
+                {"name": "Check out repository", "uses": "actions/checkout@v5"},
                 {
                     "name": "Run ruff check",
                     "uses": "astral-sh/ruff-action@v3",
