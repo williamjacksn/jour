@@ -1,7 +1,9 @@
-import jour.app
-import notch
 import signal
 import sys
+
+import notch
+
+import jour.app
 
 notch.configure()
 
