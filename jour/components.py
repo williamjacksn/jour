@@ -9,6 +9,18 @@ import markupsafe
 
 import jour.versions as v
 
+CDN = "https://cdn.jsdelivr.net/npm"
+BOOTSTRAP_CSS = htpy.link(
+    href=f"{CDN}/bootstrap@{v.bs}/dist/css/bootstrap.min.css", rel="stylesheet"
+)
+BOOTSTRAP_ICONS_CSS = htpy.link(
+    href=f"{CDN}/bootstrap-icons@{v.bi}/font/bootstrap-icons.min.css", rel="stylesheet"
+)
+BOOTSTRAP_JS = htpy.script(
+    src=f"{CDN}/bootstrap@{v.bs}/dist/js/bootstrap.bundle.min.js"
+)
+HTMX_JS = htpy.script(src=f"{CDN}/htmx.org@{v.hx}/dist/htmx.js")
+
 
 def _base(content: htpy.Node) -> htpy.Node:
     return htpy.html(lang="en")[
@@ -20,14 +32,8 @@ def _base(content: htpy.Node) -> htpy.Node:
             ),
             htpy.title["Jour"],
             htpy.link(href=flask.url_for("favicon"), rel="icon"),
-            htpy.link(
-                href=f"https://cdn.jsdelivr.net/npm/bootstrap@{v.bs}/dist/css/bootstrap.min.css",
-                rel="stylesheet",
-            ),
-            htpy.link(
-                href=f"https://cdn.jsdelivr.net/npm/bootstrap-icons@{v.bi}/font/bootstrap-icons.min.css",
-                rel="stylesheet",
-            ),
+            BOOTSTRAP_CSS,
+            BOOTSTRAP_ICONS_CSS,
         ],
         htpy.body[
             htpy.div(".container-fluid")[
@@ -37,20 +43,16 @@ def _base(content: htpy.Node) -> htpy.Node:
                     )[content]
                 ]
             ],
-            htpy.script(
-                src=f"https://cdn.jsdelivr.net/npm/bootstrap@{v.bs}/dist/js/bootstrap.bundle.min.js"
-            ),
-            htpy.script(
-                src=f"https://cdn.jsdelivr.net/npm/htmx.org@{v.hx}/dist/htmx.js"
-            ),
+            BOOTSTRAP_JS,
+            HTMX_JS,
         ],
     ]
 
 
 def _md(t: str) -> markupsafe.Markup:
     """Take markdown-formatted text as input and render into HTML."""
-    _md = markdown.Markdown()
-    doc = lxml.html.fragment_fromstring(_md.convert(t), create_parent="div")
+    md = markdown.Markdown()
+    doc = lxml.html.fragment_fromstring(md.convert(t), create_parent="div")
     for el in doc.xpath("//blockquote"):
         el.classes.update(("border-3", "border-start", "ps-2"))
     result = lxml.html.tostring(doc, encoding="unicode")
