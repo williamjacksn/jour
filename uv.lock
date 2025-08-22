@@ -259,7 +259,7 @@ requires-dist = [
     { name = "fort", specifier = ">=2024.2" },
     { name = "htpy", specifier = ">=25.4.0" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "lxml", specifier = ">=5.3.2" },
+    { name = "lxml", specifier = ">=6.0.1" },
     { name = "markdown", specifier = ">=3.7" },
     { name = "markupsafe", specifier = ">=3.0.2" },
     { name = "notch", specifier = ">=2023.1" },
