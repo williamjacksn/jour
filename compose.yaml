@@ -1,16 +1,25 @@
-services:
-  app:
-    build: .
-    image: ghcr.io/williamjacksn/jour
-    ports:
-      - 8080:8080
-    volumes:
-      - ./.local:/app/.local
-
-  shell:
-    entrypoint:
-      - /bin/bash
-    image: ghcr.io/williamjacksn/jour
-    init: true
-    volumes:
-      - ./:/app
+{
+  "services": {
+    "app": {
+      "build": ".",
+      "image": "ghcr.io/williamjacksn/jour",
+      "init": true,
+      "ports": [
+        "8080:8080"
+      ],
+      "volumes": [
+        "./.local:/app/.local"
+      ]
+    },
+    "shell": {
+      "entrypoint": [
+        "/bin/bash"
+      ],
+      "image": "ghcr.io/williamjacksn/jour",
+      "init": true,
+      "volumes": [
+        "./:/app"
+      ]
+    }
+  }
+}

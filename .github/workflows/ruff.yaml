@@ -1,6 +1,6 @@
 {
   "env": {
-    "description": "This workflow (.github/workflows/ruff.yaml) was generated from ci/gen-github-workflows.py"
+    "description": "This workflow (.github/workflows/ruff.yaml) was generated from ci/gen.py"
   },
   "jobs": {
     "ruff-check": {
