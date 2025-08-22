@@ -56,7 +56,7 @@
       "runs-on": "ubuntu-latest",
       "steps": [
         {
-          "name": "Check out the repository",
+          "name": "Check out repository",
           "uses": "actions/checkout@v5"
         },
         {

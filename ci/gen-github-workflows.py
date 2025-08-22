@@ -1,5 +1,10 @@
 import gen
+import pathlib
 
+THIS_FILE = pathlib.PurePosixPath(
+    pathlib.Path(__file__).relative_to(pathlib.Path().resolve())
+)
+ACTIONS_CHECKOUT = {"name": "Check out repository", "uses": "actions/checkout@v5"}
 push_or_dispatch = (
     "github.event_name == 'push' || github.event_name == 'workflow_dispatch'"
 )
@@ -64,7 +69,7 @@ workflow = {
             "if": push_or_dispatch,
             "runs-on": "ubuntu-latest",
             "steps": [
-                {"name": "Check out the repository", "uses": "actions/checkout@v5"},
+                ACTIONS_CHECKOUT,
                 {
                     "name": "Deploy the app",
                     "run": "sh ci/ssh-deploy.sh",
@@ -81,31 +86,29 @@ workflow = {
 
 gen.gen(workflow, ".github/workflows/build-and-deploy.yaml")
 
+target = ".github/workflows/ruff.yaml"
 ruff = {
     "name": "Ruff",
     "on": {"pull_request": {"branches": ["main"]}, "push": {"branches": ["main"]}},
     "permissions": {"contents": "read"},
-    "env": {
-        "_workflow_file_generator": "ci/gen-github-workflows.py",
-    },
+    "env": {"description": f"This workflow ({target}) was generated from {THIS_FILE}"},
     "jobs": {
-        "ruff": {
-            "name": "Run ruff linting and formatting checks",
+        "ruff-check": {
+            "name": "Run ruff check",
             "runs-on": "ubuntu-latest",
             "steps": [
-                {"name": "Check out repository", "uses": "actions/checkout@v5"},
-                {
-                    "name": "Run ruff check",
-                    "uses": "astral-sh/ruff-action@v3",
-                    "with": {"args": "check --output-format=github"},
-                },
-                {
-                    "name": "Run ruff format",
-                    "uses": "astral-sh/ruff-action@v3",
-                    "with": {"args": "format --check"},
-                },
+                ACTIONS_CHECKOUT,
+                {"name": "Run ruff check", "run": "sh ci/ruff-check.sh"},
             ],
-        }
+        },
+        "ruff-format": {
+            "name": "Run ruff format",
+            "runs-on": "ubuntu-latest",
+            "steps": [
+                ACTIONS_CHECKOUT,
+                {"name": "Run ruff format", "run": "sh ci/ruff-format.sh"},
+            ],
+        },
     },
 }
 
