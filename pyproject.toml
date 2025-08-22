@@ -17,3 +17,8 @@ dependencies = [
     "pyjwt>=2.10.1",
     "waitress>=3.0.2",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.10",
+]
