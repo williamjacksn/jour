@@ -1,2 +1,2 @@
 pip install uv
-uv run ruff format --check
+uv run --only-dev ruff format --check

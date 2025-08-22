@@ -1,2 +1,2 @@
 pip install uv
-uv run ruff check --output-format github
+uv run --only-dev ruff check --output-format github
