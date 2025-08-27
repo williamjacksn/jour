@@ -144,7 +144,7 @@ def gen_package_json():
         "license": "UNLICENSED",
         "private": True,
         "dependencies": {
-            "bootstrap": "5.3.7",
+            "bootstrap": "5.3.8",
             "bootstrap-icons": "1.13.1",
             "htmx.org": "2.0.6",
         },
