@@ -146,7 +146,7 @@ def gen_package_json():
         "dependencies": {
             "bootstrap": "5.3.8",
             "bootstrap-icons": "1.13.1",
-            "htmx.org": "2.0.6",
+            "htmx.org": "2.0.7",
         },
     }
     gen(content, target)
