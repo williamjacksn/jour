@@ -6,7 +6,7 @@ if typing.TYPE_CHECKING:
     import fort
 
 
-def init(db: "fort.SQLiteDatabase") -> None:
+def init(db: fort.SQLiteDatabase) -> None:
     db.u("""
         create table if not exists settings (
             setting_id text primary key,

@@ -5,7 +5,7 @@ if typing.TYPE_CHECKING:
     import fort
 
 
-def delete(db: "fort.SQLiteDatabase", date: datetime.date) -> None:
+def delete(db: fort.SQLiteDatabase, date: datetime.date) -> None:
     sql = """
         delete from journal_entries
         where journal_date = :journal_date
@@ -16,7 +16,7 @@ def delete(db: "fort.SQLiteDatabase", date: datetime.date) -> None:
     db.u(sql, params)
 
 
-def get_for_date(db: "fort.SQLiteDatabase", date: datetime.date) -> dict:
+def get_for_date(db: fort.SQLiteDatabase, date: datetime.date) -> dict:
     sql = """
         select journal_id, journal_date, journal_data
         from journal_entries
@@ -29,7 +29,7 @@ def get_for_date(db: "fort.SQLiteDatabase", date: datetime.date) -> dict:
 
 
 def list_dates_between(
-    db: "fort.SQLiteDatabase", start: datetime.date, end: datetime.date
+    db: fort.SQLiteDatabase, start: datetime.date, end: datetime.date
 ) -> list[datetime.date]:
     sql = """
         select distinct journal_date
@@ -46,7 +46,7 @@ def list_dates_between(
     ]
 
 
-def search(db: "fort.SQLiteDatabase", q: str, page: int = 1) -> list[dict]:
+def search(db: fort.SQLiteDatabase, q: str, page: int = 1) -> list[dict]:
     sql = """
         select
             journal_data, journal_date, printf('%.2f', rank * -1) score,
@@ -70,7 +70,7 @@ def search(db: "fort.SQLiteDatabase", q: str, page: int = 1) -> list[dict]:
     ]
 
 
-def upsert(db: "fort.SQLiteDatabase", params: dict) -> None:
+def upsert(db: fort.SQLiteDatabase, params: dict) -> None:
     journal_id = params.get("journal_id")
     sql = """
         select journal_id

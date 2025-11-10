@@ -7,7 +7,7 @@ if typing.TYPE_CHECKING:
 
 
 class Settings:
-    def __init__(self, db: "fort.SQLiteDatabase") -> None:
+    def __init__(self, db: fort.SQLiteDatabase) -> None:
         self.db = db
 
     def _get(self, setting_id: str) -> typing.Any:  # noqa: ANN401
