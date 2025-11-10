@@ -5,7 +5,7 @@ if typing.TYPE_CHECKING:
     import fort
 
 
-def delete(db: "fort.SQLiteDatabase", date: datetime.date):
+def delete(db: "fort.SQLiteDatabase", date: datetime.date) -> None:
     sql = """
         delete from journal_entries
         where journal_date = :journal_date
@@ -16,7 +16,7 @@ def delete(db: "fort.SQLiteDatabase", date: datetime.date):
     db.u(sql, params)
 
 
-def get_for_date(db: "fort.SQLiteDatabase", date: datetime.date):
+def get_for_date(db: "fort.SQLiteDatabase", date: datetime.date) -> dict:
     sql = """
         select journal_id, journal_date, journal_data
         from journal_entries
@@ -30,7 +30,7 @@ def get_for_date(db: "fort.SQLiteDatabase", date: datetime.date):
 
 def list_dates_between(
     db: "fort.SQLiteDatabase", start: datetime.date, end: datetime.date
-):
+) -> list[datetime.date]:
     sql = """
         select distinct journal_date
         from journal_entries
@@ -70,7 +70,7 @@ def search(db: "fort.SQLiteDatabase", q: str, page: int = 1) -> list[dict]:
     ]
 
 
-def upsert(db: "fort.SQLiteDatabase", params: dict):
+def upsert(db: "fort.SQLiteDatabase", params: dict) -> None:
     journal_id = params.get("journal_id")
     sql = """
         select journal_id

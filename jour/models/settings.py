@@ -7,10 +7,10 @@ if typing.TYPE_CHECKING:
 
 
 class Settings:
-    def __init__(self, db: "fort.SQLiteDatabase"):
+    def __init__(self, db: "fort.SQLiteDatabase") -> None:
         self.db = db
 
-    def _get(self, setting_id: str):
+    def _get(self, setting_id: str) -> typing.Any:  # noqa: ANN401
         sql = """
             select setting_value
             from settings
@@ -21,10 +21,14 @@ class Settings:
         }
         return self.db.q_val(sql, params)
 
-    def _set(self, setting_id: str, setting_value: str):
+    def _set(self, setting_id: str, setting_value: str) -> None:
         sql = """
-            insert into settings (setting_id, setting_value) values (:setting_id, :setting_value)
-            on conflict (setting_id) do update set setting_value = excluded.setting_value
+            insert into settings (
+                setting_id, setting_value
+            ) values (
+                :setting_id, :setting_value
+            ) on conflict (setting_id) do update set
+                setting_value = excluded.setting_value
         """
         params = {
             "setting_id": setting_id,
@@ -32,14 +36,14 @@ class Settings:
         }
         self.db.u(sql, params)
 
-    def get_enc(self, setting_id: str):
+    def get_enc(self, setting_id: str) -> bytes:
         val = self._get(setting_id)
         if val:
             f = cryptography.fernet.Fernet(self.secret_key)
             return f.decrypt(val)
-        return ""
+        return b""
 
-    def get_str(self, setting_id: str):
+    def get_str(self, setting_id: str) -> str:
         val = self._get(setting_id)
         if val:
             return str(val)
@@ -53,11 +57,11 @@ class Settings:
         return set(row["setting_id"] for row in self.db.q(sql))
 
     @property
-    def openid_client_id(self):
+    def openid_client_id(self) -> str:
         return self.get_str("openid/client-id")
 
     @openid_client_id.setter
-    def openid_client_id(self, value):
+    def openid_client_id(self, value: str) -> None:
         self.set_str("openid/client-id", value)
 
     @property
@@ -65,44 +69,44 @@ class Settings:
         return self.get_enc("openid/client-secret").decode()
 
     @openid_client_secret.setter
-    def openid_client_secret(self, value):
+    def openid_client_secret(self, value: str) -> None:
         self.set_enc("openid/client-secret", value)
 
     @property
-    def openid_discovery_document(self):
+    def openid_discovery_document(self) -> str:
         return self.get_str("openid/discovery-document")
 
     @openid_discovery_document.setter
-    def openid_discovery_document(self, value):
+    def openid_discovery_document(self, value: str) -> None:
         self.set_str("openid/discovery-document", value)
 
     @property
-    def scheme(self):
+    def scheme(self) -> str:
         return self.get_str("flask/scheme")
 
     @scheme.setter
-    def scheme(self, value):
+    def scheme(self, value: str) -> None:
         self.set_str("flask/scheme", value)
 
     @property
-    def secret_key(self):
+    def secret_key(self) -> str:
         setting_id = "flask/secret-key"
         existing_key = self._get(setting_id)
         if existing_key is None:
             self._set(setting_id, cryptography.fernet.Fernet.generate_key().decode())
         return self._get(setting_id)
 
-    def set_enc(self, setting_id: str, setting_value: str):
+    def set_enc(self, setting_id: str, setting_value: str) -> None:
         f = cryptography.fernet.Fernet(self.secret_key)
         self._set(setting_id, f.encrypt(setting_value.encode()).decode())
 
-    def set_str(self, setting_id: str, setting_value: str):
+    def set_str(self, setting_id: str, setting_value: str) -> None:
         self._set(setting_id, setting_value)
 
     @property
-    def user_email(self):
+    def user_email(self) -> str:
         return self.get_str("user/email")
 
     @user_email.setter
-    def user_email(self, value):
+    def user_email(self, value: str) -> None:
         self.set_str("user/email", value)

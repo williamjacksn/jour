@@ -4,7 +4,7 @@ import pathlib
 ACTIONS_CHECKOUT = {"name": "Check out repository", "uses": "actions/checkout@v5"}
 CONTAINER_IMAGE = "ghcr.io/williamjacksn/jour"
 THIS_FILE = pathlib.PurePosixPath(
-    pathlib.Path(__file__).relative_to(pathlib.Path().resolve())
+    pathlib.Path(__file__).relative_to(pathlib.Path.cwd())
 )
 
 push_or_dispatch = (
@@ -12,13 +12,13 @@ push_or_dispatch = (
 )
 
 
-def gen(content: dict, target: str):
+def gen(content: dict, target: str) -> None:
     pathlib.Path(target).write_text(
         json.dumps(content, indent=2, sort_keys=True), newline="\n"
     )
 
 
-def gen_compose():
+def gen_compose() -> None:
     target = "compose.yaml"
     content = {
         "services": {
@@ -40,7 +40,7 @@ def gen_compose():
     gen(content, target)
 
 
-def gen_dependabot():
+def gen_dependabot() -> None:
     target = ".github/dependabot.yaml"
     content = {
         "version": 2,
@@ -57,7 +57,7 @@ def gen_dependabot():
     gen(content, target)
 
 
-def gen_deploy_workflow():
+def gen_deploy_workflow() -> None:
     target = ".github/workflows/build-and-deploy.yaml"
     content = {
         "name": "Build and deploy app",
@@ -135,7 +135,7 @@ def gen_deploy_workflow():
     gen(content, target)
 
 
-def gen_package_json():
+def gen_package_json() -> None:
     target = "package.json"
     content = {
         "description": f"This file ({target}) was generated from {THIS_FILE}",
@@ -152,7 +152,7 @@ def gen_package_json():
     gen(content, target)
 
 
-def gen_ruff_workflow():
+def gen_ruff_workflow() -> None:
     target = ".github/workflows/ruff.yaml"
     content = {
         "name": "Ruff",
@@ -183,7 +183,7 @@ def gen_ruff_workflow():
     gen(content, target)
 
 
-def main():
+def main() -> None:
     gen_compose()
     gen_dependabot()
     gen_deploy_workflow()

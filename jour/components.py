@@ -56,7 +56,7 @@ def _md(t: str) -> markupsafe.Markup:
     for el in doc.xpath("//blockquote"):
         el.classes.update(("border-3", "border-start", "ps-2"))
     result = lxml.html.tostring(doc, encoding="unicode")
-    return markupsafe.Markup(result)
+    return markupsafe.Markup(result)  # noqa: S704
 
 
 def build_url(endpoint: str, d: datetime.date) -> str | None:

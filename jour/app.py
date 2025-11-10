@@ -2,6 +2,7 @@ import calendar
 import datetime
 import functools
 import pathlib
+import typing
 import urllib.parse
 import uuid
 
@@ -17,7 +18,7 @@ import jour.models
 app = flask.Flask(__name__)
 
 
-def _build_month(date: datetime.date):
+def _build_month(date: datetime.date) -> str:
     start = date.replace(day=1)
     end = date.replace(day=calendar.monthrange(date.year, date.month)[1])
     dwj = jour.models.journals.list_dates_between(flask.g.db, start, end)
@@ -25,13 +26,13 @@ def _build_month(date: datetime.date):
 
 
 def _get_db() -> fort.SQLiteDatabase:
-    db_path = pathlib.Path().resolve() / ".local/jour.db"
-    return fort.SQLiteDatabase(db_path)
+    db_path = pathlib.Path(".local/jour.db").resolve()
+    return fort.SQLiteDatabase(str(db_path))
 
 
-def login_required(f):
+def login_required(f: typing.Callable) -> typing.Callable:
     @functools.wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated_function(*args, **kwargs) -> str | flask.Response:  # noqa: ANN002, ANN003
         app.logger.debug(f"Logged in user: {flask.g.email}")
         if flask.g.email is None:
             return flask.redirect(flask.url_for("sign_in"))
@@ -43,7 +44,7 @@ def login_required(f):
 
 
 @app.before_request
-def before_request():
+def before_request() -> None:
     app.logger.debug(f"{flask.request.method} {flask.request.path}")
     if flask.request.method == "POST":
         for k, v in flask.request.values.lists():
@@ -57,21 +58,21 @@ def before_request():
 
 @app.get("/")
 @login_required
-def index():
+def index() -> flask.Response:
     d = datetime.date.today()
     return flask.redirect(jour.components.build_url("month", d))
 
 
 @app.get("/<year>/<month_>")
 @login_required
-def month(year, month_):
+def month(year: str, month_: str) -> str:
     date = datetime.date(int(year), int(month_), 1)
     return _build_month(date)
 
 
 @app.get("/<year>/<month_>/<day_>")
 @login_required
-def day(year, month_, day_, edit=False):
+def day(year: str, month_: str, day_: str, edit: bool = False) -> str:
     date = datetime.date(int(year), int(month_), int(day_))
     j = jour.models.journals.get_for_date(flask.g.db, date)
     if j:
@@ -86,7 +87,7 @@ def day(year, month_, day_, edit=False):
 
 @app.post("/<year>/<month_>/<day_>/delete")
 @login_required
-def day_delete(year, month_, day_):
+def day_delete(year: str, month_: str, day_: str) -> flask.Response:
     d = datetime.date(int(year), int(month_), int(day_))
     existing = jour.models.journals.get_for_date(flask.g.db, d)
     if existing:
@@ -96,13 +97,13 @@ def day_delete(year, month_, day_):
 
 @app.get("/<year>/<month_>/<day_>/edit")
 @login_required
-def day_edit(year, month_, day_):
+def day_edit(year: str, month_: str, day_: str) -> str:
     return day(year, month_, day_, edit=True)
 
 
 @app.post("/<year>/<month_>/<day_>/update")
 @login_required
-def day_update(year, month_, day_):
+def day_update(year: str, month_: str, day_: str) -> flask.Response:
     d = datetime.date(int(year), int(month_), int(day_))
     description = flask.request.values.get("entry-text")
     existing = jour.models.journals.get_for_date(flask.g.db, d)
@@ -123,9 +124,9 @@ def day_update(year, month_, day_):
 
 
 @app.get("/authorize")
-def authorize():
+def authorize() -> flask.Response:
     if flask.session.get("state") != flask.request.values.get("state"):
-        return "State mismatch", 401
+        return flask.Response("State mismatch", 401)
     discovery_document = httpx.get(flask.g.settings.openid_discovery_document).json()
     token_endpoint = discovery_document.get("token_endpoint")
     data = {
@@ -154,7 +155,7 @@ def authorize():
 
 
 @app.get("/favicon.svg")
-def favicon():
+def favicon() -> flask.Response:
     return flask.Response(jour.components.favicon(), mimetype="image/svg+xml")
 
 
@@ -171,7 +172,7 @@ def favicon():
 
 @app.post("/search")
 @login_required
-def search():
+def search() -> str:
     q = flask.request.values.get("q")
     if q:
         page = int(flask.request.values.get("page", 1))
@@ -181,7 +182,7 @@ def search():
 
 
 @app.get("/sign-in")
-def sign_in():
+def sign_in() -> flask.Response:
     state = str(uuid.uuid4())
     flask.session["state"] = state
     redirect_uri = flask.url_for(
@@ -201,7 +202,7 @@ def sign_in():
     return flask.redirect(auth_url, 307)
 
 
-def main():
+def main() -> None:
     db = _get_db()
     jour.models.init(db)
     app.secret_key = jour.models.settings.Settings(db).secret_key

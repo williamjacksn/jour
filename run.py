@@ -1,5 +1,6 @@
 import signal
 import sys
+import types
 
 import notch
 
@@ -8,7 +9,7 @@ import jour.app
 notch.configure()
 
 
-def handle_sigterm(_signal, _frame):
+def handle_sigterm(_signal: int, _frame: types.FrameType) -> None:
     sys.exit()
 
 

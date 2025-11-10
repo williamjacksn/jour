@@ -2,7 +2,7 @@ import jour.app
 import jour.models
 
 
-def main():
+def main() -> None:
     db = jour.app._get_db()
     settings = jour.models.settings.Settings(db)
     print("openid_client_id:", settings.openid_client_id)
