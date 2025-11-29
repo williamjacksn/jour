@@ -4,7 +4,6 @@
     "bootstrap-icons": "1.13.1",
     "htmx.org": "2.0.8"
   },
-  "description": "This file (package.json) was generated from ci/gen.py",
   "license": "UNLICENSED",
   "name": "jour",
   "private": true,
