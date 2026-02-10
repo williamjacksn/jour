@@ -25,7 +25,7 @@ def get_for_date(db: fort.SQLiteDatabase, date: datetime.date) -> dict:
     params = {
         "journal_date": date,
     }
-    return db.q_one(sql, params)
+    return db.q_one(sql, params) or {}
 
 
 def list_dates_between(

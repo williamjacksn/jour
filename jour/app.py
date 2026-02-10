@@ -11,6 +11,7 @@ import fort
 import httpx
 import jwt
 import waitress
+import werkzeug
 
 import jour.components
 import jour.models
@@ -32,7 +33,7 @@ def _get_db() -> fort.SQLiteDatabase:
 
 def login_required(f: typing.Callable) -> typing.Callable:
     @functools.wraps(f)
-    def decorated_function(*args, **kwargs) -> str | flask.Response:  # noqa: ANN002, ANN003
+    def decorated_function(*args, **kwargs) -> str | werkzeug.Response:  # noqa: ANN002, ANN003
         app.logger.debug(f"Logged in user: {flask.g.email}")
         if flask.g.email is None:
             return flask.redirect(flask.url_for("sign_in"))
@@ -58,7 +59,7 @@ def before_request() -> None:
 
 @app.get("/")
 @login_required
-def index() -> flask.Response:
+def index() -> werkzeug.Response:
     d = datetime.date.today()
     return flask.redirect(jour.components.build_url("month", d))
 
@@ -87,7 +88,7 @@ def day(year: str, month_: str, day_: str, edit: bool = False) -> str:
 
 @app.post("/<year>/<month_>/<day_>/delete")
 @login_required
-def day_delete(year: str, month_: str, day_: str) -> flask.Response:
+def day_delete(year: str, month_: str, day_: str) -> werkzeug.Response:
     d = datetime.date(int(year), int(month_), int(day_))
     existing = jour.models.journals.get_for_date(flask.g.db, d)
     if existing:
@@ -103,7 +104,7 @@ def day_edit(year: str, month_: str, day_: str) -> str:
 
 @app.post("/<year>/<month_>/<day_>/update")
 @login_required
-def day_update(year: str, month_: str, day_: str) -> flask.Response:
+def day_update(year: str, month_: str, day_: str) -> werkzeug.Response:
     d = datetime.date(int(year), int(month_), int(day_))
     description = flask.request.values.get("entry-text")
     existing = jour.models.journals.get_for_date(flask.g.db, d)
@@ -124,7 +125,7 @@ def day_update(year: str, month_: str, day_: str) -> flask.Response:
 
 
 @app.get("/authorize")
-def authorize() -> flask.Response:
+def authorize() -> werkzeug.Response:
     if flask.session.get("state") != flask.request.values.get("state"):
         return flask.Response("State mismatch", 401)
     discovery_document = httpx.get(flask.g.settings.openid_discovery_document).json()
@@ -182,7 +183,7 @@ def search() -> str:
 
 
 @app.get("/sign-in")
-def sign_in() -> flask.Response:
+def sign_in() -> werkzeug.Response:
     state = str(uuid.uuid4())
     flask.session["state"] = state
     redirect_uri = flask.url_for(
