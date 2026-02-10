@@ -63,7 +63,7 @@ def build_url(endpoint: str, d: datetime.date) -> str | None:
     year = d.year
     month_ = d.strftime("%m")
     day_ = d.strftime("%d")
-    if endpoint in ["month"]:
+    if endpoint == "month":
         return flask.url_for(endpoint, year=year, month_=month_)
     if endpoint in ["day", "day_delete", "day_edit", "day_update"]:
         return flask.url_for(endpoint, year=year, month_=month_, day_=day_)
