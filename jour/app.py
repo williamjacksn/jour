@@ -155,6 +155,16 @@ def authorize() -> werkzeug.Response:
     return flask.redirect(flask.url_for("index"))
 
 
+@app.post("/go")
+def go() -> werkzeug.Response:
+    year = flask.request.values["year"]
+    month_ = flask.request.values["month"]
+    d = datetime.date(int(year), int(month_), 1)
+    response = flask.make_response()
+    response.headers["HX-Location"] = jour.components.build_url("month", d)
+    return response
+
+
 @app.get("/favicon.svg")
 def favicon() -> flask.Response:
     return flask.Response(jour.components.favicon(), mimetype="image/svg+xml")

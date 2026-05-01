@@ -1,5 +1,6 @@
 import calendar
 import datetime
+from typing import Literal
 
 import flask
 import htpy
@@ -7,6 +8,7 @@ import lxml.html
 import markdown
 import markupsafe
 
+import jour.models as m
 import jour.versions as v
 
 CDN = "https://cdn.jsdelivr.net/npm"
@@ -59,14 +61,19 @@ def _md(t: str) -> markupsafe.Markup:
     return markupsafe.Markup(result)  # noqa: S704
 
 
-def build_url(endpoint: str, d: datetime.date) -> str | None:
+Endpoint = Literal["day", "day_delete", "day_edit", "day_update", "month"]
+
+
+def build_url(endpoint: Endpoint, d: datetime.date) -> str:
     year = d.year
     month_ = d.strftime("%m")
     day_ = d.strftime("%d")
     if endpoint == "month":
         return flask.url_for(endpoint, year=year, month_=month_)
-    if endpoint in ["day", "day_delete", "day_edit", "day_update"]:
+    elif endpoint in ["day", "day_delete", "day_edit", "day_update"]:
         return flask.url_for(endpoint, year=year, month_=month_, day_=day_)
+    else:
+        return flask.url_for("index")
 
 
 def day(date: datetime.date, entry_text: str) -> str:
@@ -201,7 +208,7 @@ def month(date: datetime.date, dates_with_journals: list[datetime.date]) -> str:
             else:
                 cal_tds[d] = htpy.td
     content = [
-        htpy.div(".justify-content-between.pt-3.row")[
+        htpy.div(".align-items-center.justify-content-between.pt-3.row")[
             htpy.div(".col-auto")[
                 htpy.a(
                     ".btn.btn-outline-primary",
@@ -209,7 +216,26 @@ def month(date: datetime.date, dates_with_journals: list[datetime.date]) -> str:
                 )[htpy.i(".bi-chevron-left")]
             ],
             htpy.div(".col-auto")[
-                htpy.h1[calendar.month_name[start.month], " ", start.year]
+                htpy.form[
+                    htpy.div(".input-group")[
+                        htpy.select(
+                            ".form-select", hx_post=flask.url_for("go"), name="month"
+                        )[
+                            (
+                                htpy.option(selected=(i == start.month), value=i)[m_]
+                                for i, m_ in enumerate(calendar.month_name[1:], start=1)
+                            )
+                        ],
+                        htpy.select(
+                            ".form-select", hx_post=flask.url_for("go"), name="year"
+                        )[
+                            (
+                                htpy.option(selected=(y == start.year))[y]
+                                for y in range(today.year, 1982, -1)
+                            )
+                        ],
+                    ]
+                ]
             ],
             htpy.div(".col-auto")[
                 htpy.a(
@@ -261,7 +287,7 @@ def not_authorized() -> str:
     return str(_base(content))
 
 
-def search(results: list[dict], page: int) -> str:
+def search(results: list[m.journals.SearchResult], page: int) -> str:
     content = []
     for i, r in enumerate(results):
         if i < 11:

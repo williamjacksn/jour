@@ -5,6 +5,12 @@ if typing.TYPE_CHECKING:
     import fort
 
 
+class SearchResult(typing.TypedDict):
+    journal_date: datetime.date
+    score: int
+    snip: str
+
+
 def delete(db: fort.SQLiteDatabase, date: datetime.date) -> None:
     sql = """
         delete from journal_entries
@@ -46,7 +52,7 @@ def list_dates_between(
     ]
 
 
-def search(db: fort.SQLiteDatabase, q: str, page: int = 1) -> list[dict]:
+def search(db: fort.SQLiteDatabase, q: str, page: int = 1) -> list[SearchResult]:
     sql = """
         select
             journal_data, journal_date, printf('%.2f', rank * -1) score,
