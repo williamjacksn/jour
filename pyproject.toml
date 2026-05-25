@@ -14,7 +14,7 @@ dependencies = [
     "markdown>=3.10",
     "markupsafe>=3.0.2",
     "notch>=2023.1",
-    "pyjwt>=2.10.1",
+    "pyjwt>=2.13.0",
     "waitress>=3.0.2",
 ]
 
