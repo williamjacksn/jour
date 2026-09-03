@@ -22,4 +22,4 @@ def init(db: fort.SQLiteDatabase) -> None:
     """)
 
 
-__all__ = [init, journals, settings]
+__all__ = ["init", "journals", "settings"]

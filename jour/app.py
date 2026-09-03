@@ -60,7 +60,7 @@ def before_request() -> None:
 @app.get("/")
 @login_required
 def index() -> werkzeug.Response:
-    d = datetime.date.today()
+    d = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
     return flask.redirect(jour.components.build_url("month", d))
 
 

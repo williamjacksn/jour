@@ -183,7 +183,7 @@ def month(date: datetime.date, dates_with_journals: list[datetime.date]) -> str:
     start = date.replace(day=1)
     prev_month = start - datetime.timedelta(days=1)
     next_month = start + datetime.timedelta(days=31)
-    today = datetime.date.today()
+    today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
     cal = calendar.Calendar(firstweekday=calendar.SUNDAY)
     day_names = (calendar.day_name[i][0:2] for i in cal.iterweekdays())
     cal_tds = {}

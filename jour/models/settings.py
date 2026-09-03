@@ -54,7 +54,7 @@ class Settings:
             select setting_id
             from settings
         """
-        return set(row["setting_id"] for row in self.db.q(sql))
+        return {row["setting_id"] for row in self.db.q(sql)}
 
     @property
     def openid_client_id(self) -> str:
