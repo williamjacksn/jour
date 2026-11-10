@@ -288,7 +288,7 @@ def not_authorized() -> str:
 
 
 def search(results: list[m.journals.SearchResult], page: int) -> str:
-    content = []
+    content: list[htpy.Node] = []
     for i, r in enumerate(results):
         if i < 11:
             content.append(
