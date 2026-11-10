@@ -179,6 +179,40 @@ def knock() -> str:
     return str(_base(content))
 
 
+def landing() -> str:
+    content = htpy.main(
+        ".d-flex.flex-column.justify-content-center.min-vh-100.py-5.text-center"
+    )[
+        htpy.div(".mb-4")[
+            htpy.i(
+                ".bi.bi-journal-bookmark-fill.display-3.text-success",
+                aria_hidden="true",
+            )
+        ],
+        htpy.h1(".display-3.fw-semibold.mb-3")["Jour"],
+        htpy.h2(".h3.fw-normal.mb-3")["A little space for every day."],
+        htpy.p(".lead.mb-4.text-body-secondary")[
+            "Capture your thoughts, remember the small moments, "
+            "and come back to the days that matter."
+        ],
+        htpy.ul(
+            ".d-flex.flex-wrap.gap-3.justify-content-center.list-unstyled"
+            ".mb-5.small.text-body-secondary"
+        )[
+            htpy.li["Write in Markdown"],
+            htpy.li["Browse by date"],
+            htpy.li["Search past entries"],
+        ],
+        htpy.div[
+            htpy.a(".btn.btn-success.btn-lg.px-5", href=flask.url_for("sign_in"))[
+                "Sign in"
+            ]
+        ],
+        htpy.p(".mt-3.mb-0.small.text-body-secondary")["Sign in to open your journal."],
+    ]
+    return str(_base(content))
+
+
 def month(date: dt.date, dates_with_journals: list[dt.date]) -> str:
     start = date.replace(day=1)
     prev_month = start - dt.timedelta(days=1)

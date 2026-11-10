@@ -36,7 +36,7 @@ def login_required(f: typing.Callable) -> typing.Callable:
     def decorated_function(*args, **kwargs) -> str | werkzeug.Response:  # noqa: ANN002, ANN003
         app.logger.debug(f"Logged in user: {flask.g.email}")
         if flask.g.email is None:
-            return flask.redirect(flask.url_for("sign_in"))
+            return jour.components.landing()
         if flask.g.email == flask.g.settings.user_email:
             return f(*args, **kwargs)
         return jour.components.not_authorized()
