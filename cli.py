@@ -43,7 +43,7 @@ def cli_set(args: Args) -> None:
         print(set_message)
         settings.openid_client_id = args.value
     elif args.key == "openid_client_secret":
-        print(set_message)
+        print(f"Setting {args.key}")
         settings.openid_client_secret = args.value
     elif args.key == "openid_discovery_document":
         print(set_message)
@@ -62,7 +62,8 @@ def cli_show(args: Args) -> None:
     db = jour.app._get_db()
     settings = jour.models.settings.Settings(db)
     print("openid_client_id:", settings.openid_client_id)
-    print("openid_client_secret:", settings.openid_client_secret)
+    secret_state = "(set)" if settings.openid_client_secret else "(not set)"
+    print("openid_client_secret:", secret_state)
     print("openid_discovery_document:", settings.openid_discovery_document)
     print("scheme:", settings.scheme)
     print("user_email:", settings.user_email)

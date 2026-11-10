@@ -139,14 +139,10 @@ def authorize() -> werkzeug.Response:
         ),
         "grant_type": "authorization_code",
     }
-    app.logger.debug(f"{data=}")
     response = httpx.post(token_endpoint, data=data)
-    app.logger.debug(f"{response.content=}")
     response.raise_for_status()
     response_data = response.json()
-    app.logger.debug(f"{response_data=}")
     id_token = response_data.get("id_token")
-    app.logger.debug(f"{id_token=}")
     algorithms = discovery_document.get("id_token_signing_alg_values_supported")
     claim = jwt.decode(
         id_token, options={"verify_signature": False}, algorithms=algorithms
