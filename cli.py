@@ -51,6 +51,9 @@ def cli_set(args: Args) -> None:
     elif args.key == "scheme":
         print(set_message)
         settings.scheme = args.value
+    elif args.key == "user_email":
+        print(set_message)
+        settings.user_email = args.value
     else:
         print(f"Unrecognized setting: {args.key}")
 
@@ -62,6 +65,7 @@ def cli_show(args: Args) -> None:
     print("openid_client_secret:", settings.openid_client_secret)
     print("openid_discovery_document:", settings.openid_discovery_document)
     print("scheme:", settings.scheme)
+    print("user_email:", settings.user_email)
 
 
 def main() -> None:
