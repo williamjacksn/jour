@@ -1,7 +1,6 @@
 import calendar
 import datetime as dt
 import functools
-import pathlib
 import typing
 import urllib.parse
 import uuid
@@ -22,13 +21,12 @@ app = flask.Flask(__name__)
 def _build_month(date: dt.date) -> str:
     start = date.replace(day=1)
     end = date.replace(day=calendar.monthrange(date.year, date.month)[1])
-    dwj = jour.models.journals.list_dates_between(flask.g.db, start, end)
+    dwj = jour.models.journals.list_dates_between(flask.g.user_db, start, end)
     return jour.components.month(date, dwj)
 
 
 def _get_db() -> fort.SQLiteDatabase:
-    db_path = pathlib.Path(".local/jour.db").resolve()
-    return fort.SQLiteDatabase(str(db_path))
+    return fort.SQLiteDatabase(str(jour.models.paths.app_db_path()))
 
 
 def login_required(f: typing.Callable) -> typing.Callable:
@@ -37,9 +35,11 @@ def login_required(f: typing.Callable) -> typing.Callable:
         app.logger.debug(f"Logged in user: {flask.g.email}")
         if flask.g.email is None:
             return jour.components.landing()
-        if flask.g.email == flask.g.settings.admin_email:
-            return f(*args, **kwargs)
-        return jour.components.not_authorized()
+        # Every signed-in user gets a journal database of their own
+        user = jour.models.users.get_or_create(flask.g.db, flask.g.email)
+        flask.g.user = user
+        flask.g.user_db = jour.models.userdb.open_db(user["user_id"])
+        return f(*args, **kwargs)
 
     return decorated_function
 
@@ -55,6 +55,15 @@ def before_request() -> None:
     flask.g.db = _get_db()
     flask.g.settings = jour.models.settings.Settings(flask.g.db)
     flask.g.email = flask.session.get("email")
+    flask.g.user_db = None
+
+
+@app.teardown_request
+def teardown_request(_exc: BaseException | None) -> None:
+    for name in ("user_db", "db"):
+        db = flask.g.get(name)
+        if db is not None:
+            db.cnx.close()
 
 
 @app.get("/")
@@ -75,7 +84,7 @@ def month(year: str, month_: str) -> str:
 @login_required
 def day(year: str, month_: str, day_: str, edit: bool = False) -> str:
     date = dt.date(int(year), int(month_), int(day_))
-    j = jour.models.journals.get_for_date(flask.g.db, date)
+    j = jour.models.journals.get_for_date(flask.g.user_db, date)
     if j:
         entry_text = j["journal_data"]
     else:
@@ -90,9 +99,9 @@ def day(year: str, month_: str, day_: str, edit: bool = False) -> str:
 @login_required
 def day_delete(year: str, month_: str, day_: str) -> werkzeug.Response:
     d = dt.date(int(year), int(month_), int(day_))
-    existing = jour.models.journals.get_for_date(flask.g.db, d)
+    existing = jour.models.journals.get_for_date(flask.g.user_db, d)
     if existing:
-        jour.models.journals.delete(flask.g.db, d)
+        jour.models.journals.delete(flask.g.user_db, d)
     return flask.redirect(jour.components.build_url("month", d))
 
 
@@ -107,7 +116,7 @@ def day_edit(year: str, month_: str, day_: str) -> str:
 def day_update(year: str, month_: str, day_: str) -> werkzeug.Response:
     d = dt.date(int(year), int(month_), int(day_))
     description = flask.request.values.get("entry-text")
-    existing = jour.models.journals.get_for_date(flask.g.db, d)
+    existing = jour.models.journals.get_for_date(flask.g.user_db, d)
     if existing:
         params = {
             "journal_id": existing["journal_id"],
@@ -120,7 +129,7 @@ def day_update(year: str, month_: str, day_: str) -> werkzeug.Response:
             "journal_date": d,
             "journal_data": description,
         }
-    jour.models.journals.upsert(flask.g.db, params)
+    jour.models.journals.upsert(flask.g.user_db, params)
     return flask.redirect(jour.components.build_url("day", d))
 
 
@@ -140,6 +149,11 @@ def authorize() -> werkzeug.Response:
         "grant_type": "authorization_code",
     }
     response = httpx.post(token_endpoint, data=data)
+    if response.is_error:
+        # The error body describes the problem and contains no secrets
+        app.logger.warning(
+            f"Token request failed: {response.status_code} {response.text}"
+        )
     response.raise_for_status()
     response_data = response.json()
     id_token = response_data.get("id_token")
@@ -147,7 +161,10 @@ def authorize() -> werkzeug.Response:
     claim = jwt.decode(
         id_token, options={"verify_signature": False}, algorithms=algorithms
     )
-    flask.session["email"] = claim.get("email")
+    email = claim.get("email")
+    if not email or claim.get("email_verified") is False:
+        return flask.Response("A verified email address is required", 403)
+    flask.session["email"] = jour.models.users.normalize_email(email)
     return flask.redirect(flask.url_for("index"))
 
 
@@ -183,7 +200,7 @@ def search() -> str:
     q = flask.request.values.get("q")
     if q:
         page = int(flask.request.values.get("page", 1))
-        results = jour.models.journals.search(flask.g.db, q, page)
+        results = jour.models.journals.search(flask.g.user_db, q, page)
         return jour.components.search(results, page)
     return ""
 

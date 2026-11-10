@@ -316,11 +316,6 @@ def month(date: dt.date, dates_with_journals: list[dt.date]) -> str:
     return str(_base(content))
 
 
-def not_authorized() -> str:
-    content = htpy.div(".pt-3.row")[htpy.div(".col")[htpy.h1["Not authorized"]]]
-    return str(_base(content))
-
-
 def search(results: list[m.journals.SearchResult], page: int) -> str:
     content: list[htpy.Node] = []
     for i, r in enumerate(results):
