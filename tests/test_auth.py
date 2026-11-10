@@ -8,6 +8,7 @@ from unittest import mock
 
 import jwt
 import lxml.html
+from werkzeug.test import TestResponse
 
 import jour.app
 import jour.models
@@ -139,7 +140,7 @@ class AuthenticationTests(unittest.TestCase):
             self.assertEqual(query["state"], [session["state"]])
         self.http_get.assert_called_once_with(self.settings.openid_discovery_document)
 
-    def authorize_with_claims(self, claims: dict) -> object:
+    def authorize_with_claims(self, claims: dict) -> TestResponse:
         self.settings.scheme = "http"
         self.http_get.return_value.json.return_value = {
             "token_endpoint": "https://identity.example.test/token",

@@ -56,7 +56,8 @@ class MoveJournalsToAdminTest(unittest.TestCase):
 
     def open_user_db(self, email: str) -> fort.SQLiteDatabase:
         user = jour.models.users.get_by_email(self.db, email)
-        self.assertIsNotNone(user)
+        if user is None:
+            self.fail(f"No user for {email}")
         user_db = jour.models.userdb.open_db(user["user_id"])
         self.addCleanup(user_db.cnx.close)
         return user_db
