@@ -37,7 +37,7 @@ def login_required(f: typing.Callable) -> typing.Callable:
         app.logger.debug(f"Logged in user: {flask.g.email}")
         if flask.g.email is None:
             return jour.components.landing()
-        if flask.g.email == flask.g.settings.user_email:
+        if flask.g.email == flask.g.settings.admin_email:
             return f(*args, **kwargs)
         return jour.components.not_authorized()
 
@@ -172,7 +172,7 @@ def favicon() -> flask.Response:
 #         return jour.components.knock()
 #     pw = flask.request.values.get("pw")
 #     if pw == flask.g.settings.openid_client_id:
-#         flask.session["email"] = flask.g.settings.user_email
+#         flask.session["email"] = flask.g.settings.admin_email
 #         return flask.redirect(flask.url_for("index"))
 #     return flask.redirect(flask.url_for("knock"))
 

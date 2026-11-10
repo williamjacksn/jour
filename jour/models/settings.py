@@ -40,8 +40,8 @@ REGISTRY: dict[str, SettingDef] = {
             "URL scheme (http or https) used to build the redirect URI",
         ),
         SettingDef(
-            "user_email",
-            "user/email",
+            "admin_email",
+            "admin/email",
             "Email address of the one user allowed to sign in",
         ),
     )
@@ -161,9 +161,9 @@ class Settings:
         self._set(setting_id, setting_value)
 
     @property
-    def user_email(self) -> str:
-        return self.get_str("user/email")
+    def admin_email(self) -> str:
+        return self.get_str("admin/email")
 
-    @user_email.setter
-    def user_email(self, value: str) -> None:
-        self.set_str("user/email", value)
+    @admin_email.setter
+    def admin_email(self, value: str) -> None:
+        self.set_str("admin/email", value)

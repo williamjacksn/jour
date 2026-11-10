@@ -20,7 +20,7 @@ class AuthenticationTests(unittest.TestCase):
         self.settings = self.enterContext(
             mock.patch("jour.models.settings.Settings")
         ).return_value
-        self.settings.user_email = "owner@example.test"
+        self.settings.admin_email = "owner@example.test"
         self.http_get = self.enterContext(mock.patch("jour.app.httpx.get"))
         self.client = jour.app.app.test_client()
 
@@ -53,7 +53,7 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_owner_still_goes_to_current_month(self) -> None:
         with self.client.session_transaction() as session:
-            session["email"] = self.settings.user_email
+            session["email"] = self.settings.admin_email
 
         response = self.client.get("/")
 
