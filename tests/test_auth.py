@@ -32,6 +32,7 @@ class AuthenticationTests(unittest.TestCase):
         self.settings.admin_email = "owner@example.test"
         self.http_get = self.enterContext(mock.patch("jour.app.httpx.get"))
         self.http_post = self.enterContext(mock.patch("jour.app.httpx.post"))
+        self.http_post.return_value.is_error = False
         self.client = jour.app.app.test_client()
 
     def sign_in_as(self, email: str) -> None:
@@ -174,6 +175,42 @@ class AuthenticationTests(unittest.TestCase):
         response = self.authorize_with_claims({"sub": "123"})
 
         self.assertEqual(response.status_code, 403)
+
+    def test_signed_in_pages_have_user_menu_with_sign_out(self) -> None:
+        self.sign_in_as("alice@example.test")
+
+        for path in ("/2026/11", "/2026/11/10", "/2026/11/10/edit"):
+            with self.subTest(path=path):
+                document = lxml.html.fromstring(self.page(path))
+                menu = document.xpath("//div[contains(@class, 'dropdown')]")
+                self.assertEqual(len(menu), 1)
+                self.assertIn("alice@example.test", menu[0].text_content())
+                forms = menu[0].xpath(".//form[@action='/sign-out']")
+                self.assertEqual(forms[0].get("method"), "post")
+
+    def test_signed_out_pages_have_no_user_menu(self) -> None:
+        document = lxml.html.fromstring(self.page("/"))
+
+        self.assertEqual(document.xpath("//div[contains(@class, 'dropdown')]"), [])
+
+    def test_sign_out_clears_session(self) -> None:
+        self.sign_in_as("alice@example.test")
+
+        response = self.client.post("/sign-out")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/")
+        with self.client.session_transaction() as session:
+            self.assertNotIn("email", session)
+        document = lxml.html.fromstring(self.page("/"))
+        self.assertEqual(document.xpath("//main//h1/text()"), ["Jour"])
+
+    def test_sign_out_requires_post(self) -> None:
+        self.sign_in_as("alice@example.test")
+
+        self.assertEqual(self.client.get("/sign-out").status_code, 405)
+        with self.client.session_transaction() as session:
+            self.assertEqual(session["email"], "alice@example.test")
 
 
 if __name__ == "__main__":

@@ -205,6 +205,12 @@ def search() -> str:
     return ""
 
 
+@app.post("/sign-out")
+def sign_out() -> werkzeug.Response:
+    flask.session.clear()
+    return flask.redirect(flask.url_for("index"))
+
+
 @app.get("/sign-in")
 def sign_in() -> werkzeug.Response:
     state = str(uuid.uuid4())

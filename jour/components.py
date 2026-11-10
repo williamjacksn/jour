@@ -24,7 +24,32 @@ BOOTSTRAP_JS = htpy.script(
 HTMX_JS = htpy.script(src=f"{CDN}/htmx.org@{v.hx}/dist/htmx.js")
 
 
+def _user_menu(email: str) -> htpy.Node:
+    return htpy.div(".d-flex.justify-content-end.pt-3")[
+        htpy.div(".dropdown")[
+            htpy.button(
+                ".btn.btn-outline-secondary.dropdown-toggle",
+                aria_label="User menu",
+                data_bs_toggle="dropdown",
+                type="button",
+            )[htpy.i(".bi-person-circle")],
+            htpy.ul(".dropdown-menu.dropdown-menu-end")[
+                htpy.li[htpy.span(".dropdown-item-text.text-body-secondary")[email]],
+                htpy.li[htpy.hr(".dropdown-divider")],
+                htpy.li[
+                    htpy.form(action=flask.url_for("sign_out"), method="post")[
+                        htpy.button(".dropdown-item", type="submit")[
+                            htpy.i(".bi-box-arrow-right.me-2"), "Sign out"
+                        ]
+                    ]
+                ],
+            ],
+        ]
+    ]
+
+
 def _base(content: htpy.Node) -> htpy.Node:
+    email = flask.g.get("email")
     return htpy.html(lang="en")[
         htpy.head[
             htpy.meta(charset="utf-8"),
@@ -42,7 +67,7 @@ def _base(content: htpy.Node) -> htpy.Node:
                 htpy.div(".row")[
                     htpy.div(
                         ".col-12.col-sm-9.col-md-7.col-lg-6.col-xl-5.col-xxl-4.mx-auto"
-                    )[content]
+                    )[_user_menu(email) if email else None, content]
                 ]
             ],
             BOOTSTRAP_JS,
