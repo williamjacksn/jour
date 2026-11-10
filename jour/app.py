@@ -1,5 +1,5 @@
 import calendar
-import datetime
+import datetime as dt
 import functools
 import pathlib
 import typing
@@ -19,7 +19,7 @@ import jour.models
 app = flask.Flask(__name__)
 
 
-def _build_month(date: datetime.date) -> str:
+def _build_month(date: dt.date) -> str:
     start = date.replace(day=1)
     end = date.replace(day=calendar.monthrange(date.year, date.month)[1])
     dwj = jour.models.journals.list_dates_between(flask.g.db, start, end)
@@ -60,21 +60,21 @@ def before_request() -> None:
 @app.get("/")
 @login_required
 def index() -> werkzeug.Response:
-    d = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+    d = dt.datetime.now(tz=dt.UTC).astimezone().date()
     return flask.redirect(jour.components.build_url("month", d))
 
 
 @app.get("/<year>/<month_>")
 @login_required
 def month(year: str, month_: str) -> str:
-    date = datetime.date(int(year), int(month_), 1)
+    date = dt.date(int(year), int(month_), 1)
     return _build_month(date)
 
 
 @app.get("/<year>/<month_>/<day_>")
 @login_required
 def day(year: str, month_: str, day_: str, edit: bool = False) -> str:
-    date = datetime.date(int(year), int(month_), int(day_))
+    date = dt.date(int(year), int(month_), int(day_))
     j = jour.models.journals.get_for_date(flask.g.db, date)
     if j:
         entry_text = j["journal_data"]
@@ -89,7 +89,7 @@ def day(year: str, month_: str, day_: str, edit: bool = False) -> str:
 @app.post("/<year>/<month_>/<day_>/delete")
 @login_required
 def day_delete(year: str, month_: str, day_: str) -> werkzeug.Response:
-    d = datetime.date(int(year), int(month_), int(day_))
+    d = dt.date(int(year), int(month_), int(day_))
     existing = jour.models.journals.get_for_date(flask.g.db, d)
     if existing:
         jour.models.journals.delete(flask.g.db, d)
@@ -105,7 +105,7 @@ def day_edit(year: str, month_: str, day_: str) -> str:
 @app.post("/<year>/<month_>/<day_>/update")
 @login_required
 def day_update(year: str, month_: str, day_: str) -> werkzeug.Response:
-    d = datetime.date(int(year), int(month_), int(day_))
+    d = dt.date(int(year), int(month_), int(day_))
     description = flask.request.values.get("entry-text")
     existing = jour.models.journals.get_for_date(flask.g.db, d)
     if existing:
@@ -159,7 +159,7 @@ def authorize() -> werkzeug.Response:
 def go() -> werkzeug.Response:
     year = flask.request.values["year"]
     month_ = flask.request.values["month"]
-    d = datetime.date(int(year), int(month_), 1)
+    d = dt.date(int(year), int(month_), 1)
     response = flask.make_response()
     response.headers["HX-Location"] = jour.components.build_url("month", d)
     return response

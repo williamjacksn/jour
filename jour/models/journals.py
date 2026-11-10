@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 import typing
 
 if typing.TYPE_CHECKING:
@@ -6,12 +6,12 @@ if typing.TYPE_CHECKING:
 
 
 class SearchResult(typing.TypedDict):
-    journal_date: datetime.date
+    journal_date: dt.date
     score: int
     snip: str
 
 
-def delete(db: fort.SQLiteDatabase, date: datetime.date) -> None:
+def delete(db: fort.SQLiteDatabase, date: dt.date) -> None:
     sql = """
         delete from journal_entries
         where journal_date = :journal_date
@@ -22,7 +22,7 @@ def delete(db: fort.SQLiteDatabase, date: datetime.date) -> None:
     db.u(sql, params)
 
 
-def get_for_date(db: fort.SQLiteDatabase, date: datetime.date) -> dict:
+def get_for_date(db: fort.SQLiteDatabase, date: dt.date) -> dict:
     sql = """
         select journal_id, journal_date, journal_data
         from journal_entries
@@ -35,8 +35,8 @@ def get_for_date(db: fort.SQLiteDatabase, date: datetime.date) -> dict:
 
 
 def list_dates_between(
-    db: fort.SQLiteDatabase, start: datetime.date, end: datetime.date
-) -> list[datetime.date]:
+    db: fort.SQLiteDatabase, start: dt.date, end: dt.date
+) -> list[dt.date]:
     sql = """
         select distinct journal_date
         from journal_entries
@@ -47,9 +47,7 @@ def list_dates_between(
         "start": start,
         "end": end,
     }
-    return [
-        datetime.date.fromisoformat(row["journal_date"]) for row in db.q(sql, params)
-    ]
+    return [dt.date.fromisoformat(row["journal_date"]) for row in db.q(sql, params)]
 
 
 def search(db: fort.SQLiteDatabase, q: str, page: int = 1) -> list[SearchResult]:
@@ -68,7 +66,7 @@ def search(db: fort.SQLiteDatabase, q: str, page: int = 1) -> list[SearchResult]
     }
     return [
         {
-            "journal_date": datetime.date.fromisoformat(row["journal_date"]),
+            "journal_date": dt.date.fromisoformat(row["journal_date"]),
             "score": row["score"],
             "snip": row["snip"],
         }

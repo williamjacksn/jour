@@ -1,5 +1,5 @@
 import calendar
-import datetime
+import datetime as dt
 from typing import Literal
 
 import flask
@@ -64,7 +64,7 @@ def _md(t: str) -> markupsafe.Markup:
 Endpoint = Literal["day", "day_delete", "day_edit", "day_update", "month"]
 
 
-def build_url(endpoint: Endpoint, d: datetime.date) -> str:
+def build_url(endpoint: Endpoint, d: dt.date) -> str:
     year = d.year
     month_ = d.strftime("%m")
     day_ = d.strftime("%d")
@@ -76,7 +76,7 @@ def build_url(endpoint: Endpoint, d: datetime.date) -> str:
         return flask.url_for("index")
 
 
-def day(date: datetime.date, entry_text: str) -> str:
+def day(date: dt.date, entry_text: str) -> str:
     content = [
         htpy.div(".justify-content-between.pt-3.row")[
             htpy.div(".col-auto")[
@@ -98,7 +98,7 @@ def day(date: datetime.date, entry_text: str) -> str:
     return str(_base(content))
 
 
-def day_edit(date: datetime.date, entry_text: str) -> str:
+def day_edit(date: dt.date, entry_text: str) -> str:
     content = [
         htpy.div(".justify-content-between.pt-3.row")[
             htpy.div(".col-auto")[
@@ -179,11 +179,11 @@ def knock() -> str:
     return str(_base(content))
 
 
-def month(date: datetime.date, dates_with_journals: list[datetime.date]) -> str:
+def month(date: dt.date, dates_with_journals: list[dt.date]) -> str:
     start = date.replace(day=1)
-    prev_month = start - datetime.timedelta(days=1)
-    next_month = start + datetime.timedelta(days=31)
-    today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+    prev_month = start - dt.timedelta(days=1)
+    next_month = start + dt.timedelta(days=31)
+    today = dt.datetime.now(tz=dt.UTC).astimezone().date()
     cal = calendar.Calendar(firstweekday=calendar.SUNDAY)
     day_names = (calendar.day_name[i][0:2] for i in cal.iterweekdays())
     cal_tds = {}
