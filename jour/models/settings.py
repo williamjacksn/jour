@@ -1,3 +1,4 @@
+import dataclasses
 import typing
 
 import cryptography.fernet
@@ -6,9 +7,65 @@ if typing.TYPE_CHECKING:
     import fort
 
 
+@dataclasses.dataclass(frozen=True)
+class SettingDef:
+    name: str  # attribute / CLI name
+    setting_id: str  # key in the settings table
+    description: str
+    encrypted: bool = False  # stored encrypted and hidden in CLI output
+
+
+REGISTRY: dict[str, SettingDef] = {
+    d.name: d
+    for d in (
+        SettingDef(
+            "openid_client_id",
+            "openid/client-id",
+            "OpenID Connect client ID",
+        ),
+        SettingDef(
+            "openid_client_secret",
+            "openid/client-secret",
+            "OpenID Connect client secret",
+            encrypted=True,
+        ),
+        SettingDef(
+            "openid_discovery_document",
+            "openid/discovery-document",
+            "URL of the OpenID Connect discovery document",
+        ),
+        SettingDef(
+            "scheme",
+            "flask/scheme",
+            "URL scheme (http or https) used to build the redirect URI",
+        ),
+        SettingDef(
+            "user_email",
+            "user/email",
+            "Email address of the one user allowed to sign in",
+        ),
+    )
+}
+
+
 class Settings:
     def __init__(self, db: fort.SQLiteDatabase) -> None:
         self.db = db
+
+    def get_by_name(self, name: str) -> str:
+        """Get a registered setting by its registry name."""
+        d = REGISTRY[name]
+        if d.encrypted:
+            return self.get_enc(d.setting_id).decode()
+        return self.get_str(d.setting_id)
+
+    def set_by_name(self, name: str, value: str) -> None:
+        """Set a registered setting by its registry name."""
+        d = REGISTRY[name]
+        if d.encrypted:
+            self.set_enc(d.setting_id, value)
+        else:
+            self.set_str(d.setting_id, value)
 
     def _get(self, setting_id: str) -> typing.Any:  # noqa: ANN401
         sql = """

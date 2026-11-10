@@ -20,7 +20,13 @@ def parse_args() -> Args:
     ps_init.set_defaults(func=cli_init)
 
     ps_set = sp.add_parser("set")
-    ps_set.add_argument("key")
+    ps_set.add_argument(
+        "key",
+        choices=list(jour.models.settings.REGISTRY),
+        help="; ".join(
+            f"{d.name}: {d.description}" for d in jour.models.settings.REGISTRY.values()
+        ),
+    )
     ps_set.add_argument("value")
     ps_set.set_defaults(func=cli_set)
 
@@ -38,35 +44,22 @@ def cli_init(args: Args) -> None:
 def cli_set(args: Args) -> None:
     db = jour.app._get_db()
     settings = jour.models.settings.Settings(db)
-    set_message = f"Setting {args.key} to {args.value}"
-    if args.key == "openid_client_id":
-        print(set_message)
-        settings.openid_client_id = args.value
-    elif args.key == "openid_client_secret":
+    definition = jour.models.settings.REGISTRY[args.key]
+    if definition.encrypted:
         print(f"Setting {args.key}")
-        settings.openid_client_secret = args.value
-    elif args.key == "openid_discovery_document":
-        print(set_message)
-        settings.openid_discovery_document = args.value
-    elif args.key == "scheme":
-        print(set_message)
-        settings.scheme = args.value
-    elif args.key == "user_email":
-        print(set_message)
-        settings.user_email = args.value
     else:
-        print(f"Unrecognized setting: {args.key}")
+        print(f"Setting {args.key} to {args.value}")
+    settings.set_by_name(args.key, args.value)
 
 
 def cli_show(args: Args) -> None:
     db = jour.app._get_db()
     settings = jour.models.settings.Settings(db)
-    print("openid_client_id:", settings.openid_client_id)
-    secret_state = "(set)" if settings.openid_client_secret else "(not set)"
-    print("openid_client_secret:", secret_state)
-    print("openid_discovery_document:", settings.openid_discovery_document)
-    print("scheme:", settings.scheme)
-    print("user_email:", settings.user_email)
+    for name, definition in jour.models.settings.REGISTRY.items():
+        value = settings.get_by_name(name)
+        if definition.encrypted:
+            value = "(set)" if value else "(not set)"
+        print(f"{name}:", value)
 
 
 def main() -> None:
