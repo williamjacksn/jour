@@ -312,12 +312,12 @@ class SignInTrackingTests(AdminTestCase):
         with (
             mock.patch("jour.app.httpx.get") as http_get,
             mock.patch("jour.app.httpx.post") as http_post,
-            mock.patch("jour.app.jwt.decode") as decode,
+            mock.patch("jour.oidc.verify_id_token") as verify,
         ):
             http_get.return_value.json.return_value = {"token_endpoint": "https://t"}
             http_post.return_value.is_error = False
             http_post.return_value.json.return_value = {"id_token": "x"}
-            decode.return_value = {
+            verify.return_value = {
                 "email": "Other@Example.test",
                 "email_verified": True,
             }

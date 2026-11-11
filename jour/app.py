@@ -1,6 +1,7 @@
 import calendar
 import datetime as dt
 import functools
+import secrets
 import typing
 import urllib.parse
 import uuid
@@ -8,12 +9,12 @@ import uuid
 import flask
 import fort
 import httpx
-import jwt
 import waitress
 import werkzeug
 
 import jour.components
 import jour.models
+import jour.oidc
 
 app = flask.Flask(__name__)
 # Lax stops other sites from making the browser send our cookie on cross-site POSTs
@@ -278,7 +279,10 @@ def admin_settings() -> str | tuple[str, int] | werkzeug.Response:
 
 @app.get("/authorize")
 def authorize() -> werkzeug.Response:
-    if flask.session.get("state") != flask.request.values.get("state"):
+    # Both are single use: pop them so a replayed callback cannot succeed
+    state = flask.session.pop("state", None)
+    nonce = flask.session.pop("nonce", None)
+    if not state or state != flask.request.values.get("state"):
         return flask.Response("State mismatch", 401)
     discovery_document = httpx.get(flask.g.settings.openid_discovery_document).json()
     token_endpoint = discovery_document.get("token_endpoint")
@@ -300,10 +304,16 @@ def authorize() -> werkzeug.Response:
     response.raise_for_status()
     response_data = response.json()
     id_token = response_data.get("id_token")
-    algorithms = discovery_document.get("id_token_signing_alg_values_supported")
-    claim = jwt.decode(
-        id_token, options={"verify_signature": False}, algorithms=algorithms
-    )
+    try:
+        claim = jour.oidc.verify_id_token(
+            id_token or "",
+            discovery_document=discovery_document,
+            client_id=flask.g.settings.openid_client_id,
+            nonce=nonce or "",
+        )
+    except jour.oidc.InvalidIdTokenError as e:
+        app.logger.warning(f"Rejected ID token: {e}")
+        return flask.Response("Could not verify your sign-in", 401)
     email = claim.get("email")
     if not email or claim.get("email_verified") is False:
         return flask.Response("A verified email address is required", 403)
@@ -357,8 +367,10 @@ def sign_out() -> werkzeug.Response:
 
 @app.get("/sign-in")
 def sign_in() -> werkzeug.Response:
-    state = str(uuid.uuid4())
+    state = secrets.token_urlsafe(32)
+    nonce = secrets.token_urlsafe(32)
     flask.session["state"] = state
+    flask.session["nonce"] = nonce
     redirect_uri = flask.url_for(
         "authorize", _external=True, _scheme=flask.g.settings.scheme
     )
@@ -368,6 +380,7 @@ def sign_in() -> werkzeug.Response:
         "scope": "openid email profile",
         "redirect_uri": redirect_uri,
         "state": state,
+        "nonce": nonce,
     }
     discovery_document = httpx.get(flask.g.settings.openid_discovery_document).json()
     auth_endpoint = discovery_document.get("authorization_endpoint")

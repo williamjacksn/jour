@@ -7,11 +7,25 @@ import urllib.parse
 from unittest import mock
 
 import jwt
+import jwt.algorithms
 import lxml.html
+from cryptography.hazmat.primitives.asymmetric import rsa
 from werkzeug.test import TestResponse
 
 import jour.app
 import jour.models
+
+CLIENT_ID = "test-client"
+NONCE = "nonce-123"
+ISSUER = "https://identity.example.test/v2.0"
+DISCOVERY_URL = "https://identity.example.test/openid"
+JWKS_URI = "https://identity.example.test/keys"
+SIGNING_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+OTHER_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+PUBLIC_JWK = {
+    **jwt.algorithms.RSAAlgorithm.to_jwk(SIGNING_KEY.public_key(), as_dict=True),
+    "kid": "k1",
+}
 
 
 class AuthenticationTests(unittest.TestCase):
@@ -140,19 +154,52 @@ class AuthenticationTests(unittest.TestCase):
         with self.client.session_transaction() as session:
             self.assertTrue(session["state"])
             self.assertEqual(query["state"], [session["state"]])
+            self.assertTrue(session["nonce"])
+            self.assertEqual(query["nonce"], [session["nonce"]])
+            self.assertNotEqual(session["nonce"], session["state"])
         self.http_get.assert_called_once_with(self.settings.openid_discovery_document)
 
-    def authorize_with_claims(self, claims: dict) -> TestResponse:
+    def authorize_with_claims(
+        self,
+        claims: dict,
+        *,
+        key: rsa.RSAPrivateKey = SIGNING_KEY,
+        nonce_in_session: str | None = NONCE,
+        state: str = "abc",
+    ) -> TestResponse:
         self.settings.scheme = "http"
-        self.http_get.return_value.json.return_value = {
-            "token_endpoint": "https://identity.example.test/token",
-            "id_token_signing_alg_values_supported": ["HS256"],
+        self.settings.openid_client_id = CLIENT_ID
+        self.settings.openid_discovery_document = DISCOVERY_URL
+        documents = {
+            DISCOVERY_URL: {
+                "token_endpoint": "https://identity.example.test/token",
+                "jwks_uri": JWKS_URI,
+                "issuer": ISSUER,
+                "id_token_signing_alg_values_supported": ["RS256"],
+            },
+            JWKS_URI: {"keys": [PUBLIC_JWK]},
         }
-        id_token = jwt.encode(claims, "unused", algorithm="HS256")
+        self.http_get.side_effect = lambda url, **_: mock.Mock(
+            json=lambda: documents[url]
+        )
+        now = dt.datetime.now(tz=dt.UTC)
+        full_claims = {
+            "iss": ISSUER,
+            "aud": CLIENT_ID,
+            "iat": now,
+            "exp": now + dt.timedelta(minutes=5),
+            "nonce": NONCE,
+            **claims,
+        }
+        id_token = jwt.encode(
+            full_claims, key, algorithm="RS256", headers={"kid": "k1"}
+        )
         self.http_post.return_value.json.return_value = {"id_token": id_token}
         with self.client.session_transaction() as session:
             session["state"] = "abc"
-        return self.client.get("/authorize?state=abc&code=xyz")
+            if nonce_in_session is not None:
+                session["nonce"] = nonce_in_session
+        return self.client.get(f"/authorize?state={state}&code=xyz")
 
     def test_authorize_stores_normalized_email(self) -> None:
         response = self.authorize_with_claims(
@@ -162,6 +209,8 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         with self.client.session_transaction() as session:
             self.assertEqual(session["email"], "alice@example.test")
+            self.assertNotIn("state", session)
+            self.assertNotIn("nonce", session)
 
     def test_authorize_rejects_unverified_email(self) -> None:
         response = self.authorize_with_claims(
@@ -176,6 +225,62 @@ class AuthenticationTests(unittest.TestCase):
         response = self.authorize_with_claims({"sub": "123"})
 
         self.assertEqual(response.status_code, 403)
+
+    def assert_sign_in_rejected(self, response: TestResponse) -> None:
+        self.assertEqual(response.status_code, 401)
+        with self.client.session_transaction() as session:
+            self.assertNotIn("email", session)
+        self.assertEqual(self.database.q("select * from users"), [])
+
+    def test_authorize_rejects_token_signed_by_unknown_key(self) -> None:
+        response = self.authorize_with_claims(
+            {"email": "alice@example.test"}, key=OTHER_KEY
+        )
+
+        self.assert_sign_in_rejected(response)
+
+    def test_authorize_rejects_wrong_audience(self) -> None:
+        response = self.authorize_with_claims(
+            {"email": "alice@example.test", "aud": "another-app"}
+        )
+
+        self.assert_sign_in_rejected(response)
+
+    def test_authorize_rejects_wrong_nonce(self) -> None:
+        response = self.authorize_with_claims(
+            {"email": "alice@example.test", "nonce": "attacker-nonce"}
+        )
+
+        self.assert_sign_in_rejected(response)
+
+    def test_authorize_rejects_when_session_has_no_nonce(self) -> None:
+        response = self.authorize_with_claims(
+            {"email": "alice@example.test"}, nonce_in_session=None
+        )
+
+        self.assert_sign_in_rejected(response)
+
+    def test_authorize_rejects_state_mismatch(self) -> None:
+        response = self.authorize_with_claims(
+            {"email": "alice@example.test"}, state="other"
+        )
+
+        self.assert_sign_in_rejected(response)
+
+    def test_authorize_without_any_state_is_rejected(self) -> None:
+        # Neither side has a state: None == None must not count as a match
+        response = self.client.get("/authorize")
+
+        self.assertEqual(response.status_code, 401)
+        self.http_post.assert_not_called()
+
+    def test_authorize_callback_cannot_be_replayed(self) -> None:
+        first = self.authorize_with_claims({"email": "alice@example.test"})
+        self.assertEqual(first.status_code, 302)
+
+        replay = self.client.get("/authorize?state=abc&code=xyz")
+
+        self.assertEqual(replay.status_code, 401)
 
     def test_signed_in_pages_have_user_menu_with_sign_out(self) -> None:
         self.sign_in_as("alice@example.test")
