@@ -16,6 +16,8 @@ import jour.components
 import jour.models
 
 app = flask.Flask(__name__)
+# Lax stops other sites from making the browser send our cookie on cross-site POSTs
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 
 def _build_month(date: dt.date) -> str:
@@ -31,14 +33,32 @@ def _get_db() -> fort.SQLiteDatabase:
 
 def login_required(f: typing.Callable) -> typing.Callable:
     @functools.wraps(f)
-    def decorated_function(*args, **kwargs) -> str | werkzeug.Response:  # noqa: ANN002, ANN003
+    def decorated_function(*args, **kwargs) -> typing.Any:  # noqa: ANN002, ANN003, ANN401
         app.logger.debug(f"Logged in user: {flask.g.email}")
         if flask.g.email is None:
             return jour.components.landing()
-        # Every signed-in user gets a journal database of their own
-        user = jour.models.users.get_or_create(flask.g.db, flask.g.email)
+        user = jour.models.users.get_by_email(flask.g.db, flask.g.email)
+        if user is None:
+            if not jour.models.access.signup_allowed(flask.g.settings, flask.g.email):
+                return jour.components.not_invited(), 403
+            user = jour.models.users.get_or_create(flask.g.db, flask.g.email)
+        # The administrator can never be locked out by the disabled flag
+        if user["is_disabled"] and not flask.g.is_admin:
+            return jour.components.account_disabled(), 403
         flask.g.user = user
+        # Every user gets a journal database of their own
         flask.g.user_db = jour.models.userdb.open_db(user["user_id"])
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+def admin_required(f: typing.Callable) -> typing.Callable:
+    @login_required
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs) -> typing.Any:  # noqa: ANN002, ANN003, ANN401
+        if not flask.g.is_admin:
+            return jour.components.forbidden(), 403
         return f(*args, **kwargs)
 
     return decorated_function
@@ -48,13 +68,16 @@ def login_required(f: typing.Callable) -> typing.Callable:
 def before_request() -> None:
     app.logger.debug(f"{flask.request.method} {flask.request.path}")
     if flask.request.method == "POST":
-        for k, v in flask.request.values.lists():
-            app.logger.debug(f"{k}: {v}")
+        # Field names only: values can be journal text or secrets
+        app.logger.debug(f"Form fields: {list(flask.request.values.keys())}")
 
     flask.session.permanent = True
     flask.g.db = _get_db()
     flask.g.settings = jour.models.settings.Settings(flask.g.db)
     flask.g.email = flask.session.get("email")
+    flask.g.is_admin = jour.models.access.is_admin(
+        flask.g.settings.admin_email, flask.g.email
+    )
     flask.g.user_db = None
 
 
@@ -133,6 +156,126 @@ def day_update(year: str, month_: str, day_: str) -> werkzeug.Response:
     return flask.redirect(jour.components.build_url("day", d))
 
 
+@app.get("/admin")
+@admin_required
+def admin() -> werkzeug.Response:
+    return flask.redirect(flask.url_for("admin_users"))
+
+
+@app.get("/admin/users")
+@admin_required
+def admin_users() -> str:
+    admin_email = flask.g.settings.admin_email
+    rows = []
+    for u in jour.models.users.list_all(flask.g.db):
+        entries, size = jour.models.userdb.stats(u["user_id"])
+        rows.append(
+            {
+                **u,
+                "entries": entries,
+                "size": size,
+                "is_admin": jour.models.access.is_admin(admin_email, u["email"]),
+            }
+        )
+    return jour.components.admin_users(rows)
+
+
+def _target_user(user_id: str) -> dict:
+    """Look up the user an admin action applies to; the admin cannot target self."""
+    user = jour.models.users.get_by_id(flask.g.db, user_id)
+    if user is None:
+        flask.abort(404)
+    if jour.models.access.is_admin(flask.g.settings.admin_email, user["email"]):
+        flask.abort(400)
+    return user
+
+
+@app.post("/admin/users/<user_id>/disable")
+@admin_required
+def admin_user_disable(user_id: str) -> werkzeug.Response:
+    user = _target_user(user_id)
+    jour.models.users.set_disabled(flask.g.db, user["user_id"], disabled=True)
+    return flask.redirect(flask.url_for("admin_users"))
+
+
+@app.post("/admin/users/<user_id>/enable")
+@admin_required
+def admin_user_enable(user_id: str) -> werkzeug.Response:
+    user = _target_user(user_id)
+    jour.models.users.set_disabled(flask.g.db, user["user_id"], disabled=False)
+    return flask.redirect(flask.url_for("admin_users"))
+
+
+@app.post("/admin/users/<user_id>/delete")
+@admin_required
+def admin_user_delete(user_id: str) -> werkzeug.Response:
+    user = _target_user(user_id)
+    jour.models.userdb.delete_files(user["user_id"])
+    jour.models.users.delete(flask.g.db, user["user_id"])
+    return flask.redirect(flask.url_for("admin_users"))
+
+
+SETTINGS_FIELDS = (
+    "admin_email",
+    "openid_client_id",
+    "openid_discovery_document",
+    "scheme",
+    "signup_allowlist",
+    "signup_policy",
+)
+
+
+def _validate_settings(
+    form: typing.Mapping[str, str],
+) -> tuple[dict[str, str], list[str]]:
+    errors: list[str] = []
+    values = {name: form.get(name, "").strip() for name in SETTINGS_FIELDS}
+    values["admin_email"] = jour.models.users.normalize_email(values["admin_email"])
+    if "@" not in values["admin_email"] or " " in values["admin_email"]:
+        errors.append("Admin email must be an email address.")
+    if not values["openid_client_id"]:
+        errors.append("Client ID is required.")
+    discovery = urllib.parse.urlparse(values["openid_discovery_document"])
+    if discovery.scheme not in ("http", "https") or not discovery.netloc:
+        errors.append("Discovery document must be an http or https URL.")
+    if values["scheme"] not in ("http", "https"):
+        errors.append("Redirect URI scheme must be http or https.")
+    if values["signup_policy"] not in jour.models.access.POLICIES:
+        errors.append("Choose who can create an account.")
+    # Store the allowlist tidy: one normalized entry per line
+    entries = jour.models.access.parse_allowlist(values["signup_allowlist"])
+    values["signup_allowlist"] = "\n".join(sorted(entries))
+    return values, errors
+
+
+@app.route("/admin/settings", methods=["GET", "POST"])
+@admin_required
+def admin_settings() -> str | tuple[str, int] | werkzeug.Response:
+    s = flask.g.settings
+    if flask.request.method == "POST":
+        values, errors = _validate_settings(flask.request.form)
+        if errors:
+            return (
+                jour.components.admin_settings(
+                    values, errors, secret_is_set=bool(s.openid_client_secret)
+                ),
+                400,
+            )
+        for name, value in values.items():
+            s.set_by_name(name, value)
+        secret = flask.request.form.get("openid_client_secret", "").strip()
+        if secret:
+            s.openid_client_secret = secret
+        return flask.redirect(flask.url_for("admin_settings", saved=1))
+    values = {name: s.get_by_name(name) for name in SETTINGS_FIELDS}
+    return jour.components.admin_settings(
+        values,
+        [],
+        saved=flask.request.args.get("saved") == "1",
+        secret_is_set=bool(s.openid_client_secret),
+    )
+
+
 @app.get("/authorize")
 def authorize() -> werkzeug.Response:
     if flask.session.get("state") != flask.request.values.get("state"):
@@ -165,6 +308,7 @@ def authorize() -> werkzeug.Response:
     if not email or claim.get("email_verified") is False:
         return flask.Response("A verified email address is required", 403)
     flask.session["email"] = jour.models.users.normalize_email(email)
+    jour.models.users.record_sign_in(flask.g.db, email)
     return flask.redirect(flask.url_for("index"))
 
 

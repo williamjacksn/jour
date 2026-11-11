@@ -1,9 +1,11 @@
 import contextlib
+import datetime as dt
 import pathlib
 import sqlite3
 import typing
+import uuid
 
-from . import journals, paths, schema, settings, userdb, users
+from . import access, journals, paths, schema, settings, userdb, users
 
 if typing.TYPE_CHECKING:
     import fort
@@ -48,6 +50,16 @@ def _migrate_3(db: fort.SQLiteDatabase) -> None:
     """)
 
 
+def _migrate_5(db: fort.SQLiteDatabase) -> None:
+    # Track sign-ins, and let an administrator disable an account
+    # Check first so a retry after a partial failure is harmless
+    have = {row["name"] for row in db.q("select name from pragma_table_info('users')")}
+    if "last_sign_in_at" not in have:
+        db.u("alter table users add column last_sign_in_at text")
+    if "is_disabled" not in have:
+        db.u("alter table users add column is_disabled integer not null default 0")
+
+
 def _table_exists(db: fort.SQLiteDatabase, name: str) -> bool:
     sql = """
         select 1
@@ -72,6 +84,30 @@ def _backup_app_db(db: fort.SQLiteDatabase) -> None:
         src.backup(dst)
 
 
+def _ensure_user_v3(db: fort.SQLiteDatabase, email: str) -> str:
+    """Find or create a user using only the schema as of migration 3.
+
+    Migrations must not call the evolving `users` module, which may expect columns
+    added by later migrations.
+    """
+    email = users.normalize_email(email)
+    sql = "select user_id from users where email = :email"
+    user_id = db.q_val(sql, {"email": email})
+    if user_id is None:
+        user_id = str(uuid.uuid4())
+        sql = """
+            insert into users (user_id, email, created_at)
+            values (:user_id, :email, :created_at)
+        """
+        params = {
+            "user_id": user_id,
+            "email": email,
+            "created_at": dt.datetime.now(tz=dt.UTC).isoformat(),
+        }
+        db.u(sql, params)
+    return user_id
+
+
 def _migrate_4(db: fort.SQLiteDatabase) -> None:
     # Move the old shared journal into the admin user's own database
     if _table_exists(db, "journal_entries"):
@@ -91,8 +127,7 @@ def _migrate_4(db: fort.SQLiteDatabase) -> None:
                 )
                 raise RuntimeError(msg)
             _backup_app_db(db)
-            admin = users.get_or_create(db, admin_email)
-            user_db = userdb.open_db(admin["user_id"])
+            user_db = userdb.open_db(_ensure_user_v3(db, admin_email))
             try:
                 # Skip anything copied by an earlier, interrupted attempt
                 sql = "select journal_id from journal_entries"
@@ -123,6 +158,7 @@ MIGRATIONS: list[schema.Migration] = [
     _migrate_2,
     _migrate_3,
     _migrate_4,
+    _migrate_5,
 ]
 
 
@@ -135,6 +171,7 @@ def init(db: fort.SQLiteDatabase) -> None:
 
 
 __all__ = [
+    "access",
     "get_schema_version",
     "init",
     "journals",

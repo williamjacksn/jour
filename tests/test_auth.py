@@ -30,6 +30,7 @@ class AuthenticationTests(unittest.TestCase):
         jour.models.init(self.database)
         self.settings = jour.models.settings.Settings(self.database)
         self.settings.admin_email = "owner@example.test"
+        self.settings.signup_policy = "open"
         self.http_get = self.enterContext(mock.patch("jour.app.httpx.get"))
         self.http_post = self.enterContext(mock.patch("jour.app.httpx.post"))
         self.http_post.return_value.is_error = False

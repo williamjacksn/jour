@@ -1,3 +1,6 @@
+import contextlib
+import sqlite3
+
 import fort
 
 from . import paths, schema
@@ -26,3 +29,26 @@ def open_db(user_id: str) -> fort.SQLiteDatabase:
     db = fort.SQLiteDatabase(str(path))
     init(db)
     return db
+
+
+def stats(user_id: str) -> tuple[int | None, int]:
+    """Return (entry count, file size in bytes) without creating anything."""
+    path = paths.user_db_path(user_id)
+    if not path.exists():
+        return 0, 0
+    size = path.stat().st_size
+    try:
+        with contextlib.closing(
+            sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
+        ) as c:
+            count = c.execute("select count(*) from journal_entries").fetchone()[0]
+    except sqlite3.Error:
+        return None, size
+    return count, size
+
+
+def delete_files(user_id: str) -> None:
+    """Remove a user's database and any SQLite side files."""
+    path = paths.user_db_path(user_id)
+    for suffix in ("", "-wal", "-shm", "-journal"):
+        path.with_name(path.name + suffix).unlink(missing_ok=True)

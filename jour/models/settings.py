@@ -42,7 +42,17 @@ REGISTRY: dict[str, SettingDef] = {
         SettingDef(
             "admin_email",
             "admin/email",
-            "Email address of the one user allowed to sign in",
+            "Email address of the administrator",
+        ),
+        SettingDef(
+            "signup_policy",
+            "signup/policy",
+            "Who may create an account on first sign-in: open or allowlist",
+        ),
+        SettingDef(
+            "signup_allowlist",
+            "signup/allowlist",
+            "Emails and @domains allowed to sign up when the policy is allowlist",
         ),
     )
 }
@@ -167,3 +177,19 @@ class Settings:
     @admin_email.setter
     def admin_email(self, value: str) -> None:
         self.set_str("admin/email", value)
+
+    @property
+    def signup_allowlist(self) -> str:
+        return self.get_str("signup/allowlist")
+
+    @signup_allowlist.setter
+    def signup_allowlist(self, value: str) -> None:
+        self.set_str("signup/allowlist", value)
+
+    @property
+    def signup_policy(self) -> str:
+        return self.get_str("signup/policy")
+
+    @signup_policy.setter
+    def signup_policy(self, value: str) -> None:
+        self.set_str("signup/policy", value)
