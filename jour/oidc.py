@@ -96,7 +96,7 @@ def verify_id_token(
             audience=client_id,
             issuer=_expected_issuer(discovery_document, id_token),
             leeway=CLOCK_LEEWAY_SECONDS,
-            options={"require": ["exp", "iat", "iss", "aud"]},
+            options={"require": ["exp", "iat", "iss", "aud", "sub"]},
         )
     except jwt.PyJWTError as e:
         msg = f"Invalid ID token: {e}"

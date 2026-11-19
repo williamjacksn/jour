@@ -5,7 +5,18 @@ import sqlite3
 import typing
 import uuid
 
-from . import access, journals, paths, schema, settings, userdb, users
+from . import (
+    access,
+    identities,
+    journals,
+    paths,
+    providers,
+    schema,
+    settings,
+    signin,
+    userdb,
+    users,
+)
 
 if typing.TYPE_CHECKING:
     import fort
@@ -152,6 +163,75 @@ def _migrate_4(db: fort.SQLiteDatabase) -> None:
         db.u("drop table journals")
 
 
+def _migrate_6(db: fort.SQLiteDatabase) -> None:
+    """Replace the single hard-wired provider with a table of providers.
+
+    Also adds `identities`, which tie a provider's stable subject id to a user, so
+    accounts no longer depend on an email address alone.
+    """
+    db.u("""
+        create table if not exists providers (
+            provider_id text primary key,
+            display_name text not null,
+            discovery_document text not null,
+            client_id text not null,
+            client_secret text not null default '',
+            is_enabled integer not null default 1,
+            trust_email integer not null default 0
+        )
+    """)
+    db.u("""
+        create table if not exists identities (
+            provider_id text not null,
+            subject text not null,
+            user_id text not null,
+            created_at text not null,
+            primary key (provider_id, subject)
+        )
+    """)
+    db.u("create index if not exists identities_user on identities (user_id)")
+
+    def old(setting_id: str) -> str:
+        sql = "select setting_value from settings where setting_id = :id"
+        return db.q_val(sql, {"id": setting_id}) or ""
+
+    client_id = old("openid/client-id")
+    discovery = old("openid/discovery-document")
+    if client_id and discovery:
+        is_microsoft = "login.microsoftonline.com" in discovery
+        provider_id = "microsoft" if is_microsoft else "oidc"
+        sql = """
+            insert into providers (
+                provider_id, display_name, discovery_document, client_id,
+                client_secret, is_enabled, trust_email
+            ) values (
+                :provider_id, :display_name, :discovery, :client_id, :secret, 1, 1
+            ) on conflict (provider_id) do nothing
+        """
+        params = {
+            "provider_id": provider_id,
+            "display_name": "Microsoft" if is_microsoft else "Single sign-on",
+            "discovery": discovery,
+            "client_id": client_id,
+            # Already encrypted with the same key, so it can be copied as is
+            "secret": old("openid/client-secret"),
+        }
+        db.u(sql, params)
+        # Keep the callback URL registered with the provider working
+        sql = """
+            insert into settings (setting_id, setting_value)
+            values ('signin/legacy-provider', :provider_id)
+            on conflict (setting_id) do nothing
+        """
+        db.u(sql, {"provider_id": provider_id})
+    db.u("""
+        delete from settings
+        where setting_id in (
+            'openid/client-id', 'openid/client-secret', 'openid/discovery-document'
+        )
+    """)
+
+
 # Append new migrations to the end. Never edit or reorder existing ones.
 MIGRATIONS: list[schema.Migration] = [
     _migrate_1,
@@ -159,6 +239,7 @@ MIGRATIONS: list[schema.Migration] = [
     _migrate_3,
     _migrate_4,
     _migrate_5,
+    _migrate_6,
 ]
 
 
@@ -173,11 +254,14 @@ def init(db: fort.SQLiteDatabase) -> None:
 __all__ = [
     "access",
     "get_schema_version",
+    "identities",
     "init",
     "journals",
     "paths",
+    "providers",
     "schema",
     "settings",
+    "signin",
     "userdb",
     "users",
 ]

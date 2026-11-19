@@ -1,56 +1,15 @@
 import pathlib
-import secrets
-import tempfile
-import unittest
-from unittest import mock
 
 import lxml.html
 
-import jour.app
 import jour.models
+from tests import support
+from tests.support import ADMIN
 
-ADMIN = "owner@example.test"
 
-
-class AdminTestCase(unittest.TestCase):
-    def setUp(self) -> None:
-        tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
-        self.addCleanup(tmp.cleanup)
-        self.data_dir = pathlib.Path(tmp.name)
-        self.enterContext(mock.patch("jour.models.paths.DATA_DIR", self.data_dir))
-        self.enterContext(
-            mock.patch.dict(
-                jour.app.app.config, TESTING=True, SECRET_KEY=secrets.token_hex(32)
-            )
-        )
-        self.database = jour.app._get_db()
-        self.addCleanup(self.database.cnx.close)
-        jour.models.init(self.database)
-        self.settings = jour.models.settings.Settings(self.database)
-        self.settings.admin_email = ADMIN
-        self.settings.openid_client_id = "client-id"
-        self.settings.openid_client_secret = "super-secret-value"  # noqa: S105
-        self.settings.openid_discovery_document = "https://idp.example.test/.well-known"
-        self.settings.scheme = "https"
-        self.client = jour.app.app.test_client()
-
-    def sign_in_as(self, email: str) -> None:
-        with self.client.session_transaction() as session:
-            session["email"] = email
-
-    def make_user(self, email: str) -> dict:
-        """Create a user with a journal entry, as if they had signed in."""
-        user = jour.models.users.get_or_create(self.database, email)
-        user_db = jour.models.userdb.open_db(user["user_id"])
-        user_db.u("insert into journal_entries values ('1', '2026-11-10', 'hello')")
-        user_db.cnx.close()
-        return user
-
+class AdminTestCase(support.AppTestCase):
     def user_db_path(self, user: dict) -> pathlib.Path:
         return jour.models.paths.user_db_path(user["user_id"])
-
-    def text(self, path: str) -> str:
-        return self.client.get(path).get_data(as_text=True)
 
 
 class AccessTests(AdminTestCase):
@@ -64,6 +23,12 @@ class AccessTests(AdminTestCase):
             ("GET", "/admin/users"),
             ("GET", "/admin/settings"),
             ("POST", "/admin/settings"),
+            ("GET", "/admin/providers"),
+            ("GET", "/admin/providers/new"),
+            ("POST", "/admin/providers/new"),
+            ("GET", "/admin/providers/idp"),
+            ("POST", "/admin/providers/idp"),
+            ("POST", "/admin/providers/idp/delete"),
             ("POST", f"/admin/users/{uid}/disable"),
             ("POST", f"/admin/users/{uid}/enable"),
             ("POST", f"/admin/users/{uid}/delete"),
@@ -73,6 +38,7 @@ class AccessTests(AdminTestCase):
 
         self.assertIsNotNone(jour.models.users.get_by_id(self.database, uid))
         self.assertTrue(self.user_db_path(other).exists())
+        self.assertIsNotNone(jour.models.providers.get(self.database, "idp"))
 
     def test_signed_out_gets_landing_not_admin(self) -> None:
         response = self.client.get("/admin/users")
@@ -87,63 +53,16 @@ class AccessTests(AdminTestCase):
 
     def test_only_admin_sees_admin_menu_link(self) -> None:
         self.sign_in_as("other@example.test")
-        self.settings.signup_policy = "open"
-        links = lxml.html.fromstring(self.text("/2026/11")).xpath(
+        links = lxml.html.fromstring(self.page("/2026/11")).xpath(
             "//a[@href='/admin/users']"
         )
         self.assertEqual(links, [])
 
         self.sign_in_as(ADMIN)
-        links = lxml.html.fromstring(self.text("/2026/11")).xpath(
+        links = lxml.html.fromstring(self.page("/2026/11")).xpath(
             "//a[@href='/admin/users']"
         )
         self.assertEqual(len(links), 1)
-
-
-class SignupPolicyTests(AdminTestCase):
-    def assert_denied(self, email: str) -> None:
-        self.sign_in_as(email)
-        response = self.client.get("/")
-        self.assertEqual(response.status_code, 403)
-        self.assertIn("Not invited", response.get_data(as_text=True))
-        self.assertIsNone(jour.models.users.get_by_email(self.database, email))
-
-    def assert_allowed(self, email: str) -> None:
-        self.sign_in_as(email)
-        self.assertEqual(self.client.get("/").status_code, 302)
-        self.assertIsNotNone(jour.models.users.get_by_email(self.database, email))
-
-    def test_unset_policy_fails_closed(self) -> None:
-        self.assert_denied("stranger@example.test")
-        self.assertFalse((self.data_dir / "users").exists())
-
-    def test_admin_may_always_sign_up(self) -> None:
-        self.assert_allowed(ADMIN)
-
-    def test_allowlist_matches_emails_and_domains(self) -> None:
-        self.settings.signup_policy = "allowlist"
-        self.settings.signup_allowlist = "friend@example.test\n@family.test, "
-
-        self.assert_allowed("Friend@Example.test")
-        self.assert_allowed("anyone@family.test")
-        self.assert_denied("stranger@example.test")
-        self.assert_denied("x@sub.family.test")
-
-    def test_open_policy_allows_anyone(self) -> None:
-        self.settings.signup_policy = "open"
-
-        self.assert_allowed("stranger@example.test")
-
-    def test_unknown_policy_value_fails_closed(self) -> None:
-        self.settings.signup_policy = "yolo"
-
-        self.assert_denied("stranger@example.test")
-
-    def test_existing_users_are_unaffected_by_stricter_policy(self) -> None:
-        self.make_user("old@example.test")
-        self.settings.signup_policy = "allowlist"
-
-        self.assert_allowed("old@example.test")
 
 
 class UserManagementTests(AdminTestCase):
@@ -154,19 +73,17 @@ class UserManagementTests(AdminTestCase):
         self.sign_in_as(ADMIN)
 
     def test_user_list_shows_users_and_entry_counts(self) -> None:
-        document = lxml.html.fromstring(self.text("/admin/users"))
+        document = lxml.html.fromstring(self.page("/admin/users"))
 
         rows = {
             tr.xpath("string(td[1]/text()[1])"): tr.xpath("string(td[4])")
             for tr in document.xpath("//tbody/tr")
         }
-        # Viewing the page created the admin's own (empty) account too
+        # The admin's own (empty) account exists because they are signed in
         self.assertEqual(rows, {"other@example.test": "1", ADMIN: "0"})
 
-    def test_admin_row_is_listed_with_badge_and_no_actions(self) -> None:
-        jour.models.users.get_or_create(self.database, ADMIN)
-
-        document = lxml.html.fromstring(self.text("/admin/users"))
+    def test_admin_row_has_badge_and_no_actions(self) -> None:
+        document = lxml.html.fromstring(self.page("/admin/users"))
 
         row = document.xpath(f"//tr[td[contains(., '{ADMIN}')]]")[0]
         self.assertIn("admin", row.xpath("string(td[1])"))
@@ -186,7 +103,8 @@ class UserManagementTests(AdminTestCase):
         self.sign_in_as("other@example.test")
         self.assertEqual(self.client.get("/2026/11").status_code, 200)
 
-    def test_delete_removes_user_and_database_file(self) -> None:
+    def test_delete_removes_user_identities_and_database_file(self) -> None:
+        jour.models.identities.link(self.database, "idp", "sub-1", self.uid)
         path = self.user_db_path(self.other)
         self.assertTrue(path.exists())
 
@@ -194,12 +112,31 @@ class UserManagementTests(AdminTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIsNone(jour.models.users.get_by_id(self.database, self.uid))
+        self.assertIsNone(
+            jour.models.identities.find_user_id(self.database, "idp", "sub-1")
+        )
         self.assertFalse(path.exists())
 
+    def test_deleted_user_is_signed_out_not_recreated(self) -> None:
+        self.client.post(f"/admin/users/{self.uid}/delete")
+        # The deleted user still has a cookie naming their old id
+        with self.client.session_transaction() as session:
+            session.clear()
+            session["user_id"] = self.uid
+
+        document = lxml.html.fromstring(self.page("/2026/11"))
+
+        self.assertIsNone(
+            jour.models.users.get_by_email(self.database, "other@example.test")
+        )
+        self.assertEqual(document.xpath("//main//h1/text()"), ["Jour"])
+
     def test_admin_cannot_disable_or_delete_themselves(self) -> None:
-        admin = jour.models.users.get_or_create(self.database, ADMIN)
-        path = self.user_db_path(admin)
+        admin = jour.models.users.get_by_email(self.database, ADMIN)
+        if admin is None:
+            self.fail("admin account should exist")
         jour.models.userdb.open_db(admin["user_id"]).cnx.close()
+        path = self.user_db_path(admin)
 
         for action in ("disable", "delete"):
             with self.subTest(action=action):
@@ -228,9 +165,6 @@ class SettingsPageTests(AdminTestCase):
     def valid_form(self, **overrides: str) -> dict[str, str]:
         form = {
             "admin_email": ADMIN,
-            "openid_client_id": "client-id",
-            "openid_client_secret": "",
-            "openid_discovery_document": "https://idp.example.test/.well-known",
             "scheme": "https",
             "signup_policy": "allowlist",
             "signup_allowlist": "",
@@ -238,16 +172,17 @@ class SettingsPageTests(AdminTestCase):
         form.update(overrides)
         return form
 
-    def test_page_never_shows_client_secret(self) -> None:
-        html = self.client.get("/admin/settings").get_data(as_text=True)
+    def test_page_has_no_identity_provider_fields(self) -> None:
+        document = lxml.html.fromstring(self.page("/admin/settings"))
 
-        self.assertNotIn("super-secret-value", html)
-        self.assertIn("A secret is set", html)
-        self.assertIn("client-id", html)
+        names = set(document.xpath("//form//*[@name]/@name"))
+        self.assertEqual(
+            names, {"admin_email", "scheme", "signup_policy", "signup_allowlist"}
+        )
 
-    def test_save_updates_settings_and_keeps_secret_when_blank(self) -> None:
+    def test_save_updates_settings(self) -> None:
         form = self.valid_form(
-            openid_client_id="new-id",
+            scheme="http",
             signup_policy="open",
             signup_allowlist="B@x.test\n@Corp.test, a@x.test",
         )
@@ -255,28 +190,15 @@ class SettingsPageTests(AdminTestCase):
         response = self.client.post("/admin/settings", data=form)
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(self.settings.openid_client_id, "new-id")
+        self.assertEqual(self.settings.scheme, "http")
         self.assertEqual(self.settings.signup_policy, "open")
         self.assertEqual(
             self.settings.signup_allowlist, "@corp.test\na@x.test\nb@x.test"
         )
-        self.assertEqual(self.settings.openid_client_secret, "super-secret-value")
-
-    def test_save_replaces_secret_when_given(self) -> None:
-        self.client.post(
-            "/admin/settings",
-            data=self.valid_form(openid_client_secret="fresh"),  # noqa: S106
-        )
-
-        self.assertEqual(self.settings.openid_client_secret, "fresh")
 
     def test_invalid_input_is_rejected_and_nothing_is_saved(self) -> None:
         form = self.valid_form(
-            admin_email="not-an-email",
-            openid_client_id="changed",
-            openid_discovery_document="javascript:alert(1)",
-            scheme="ftp",
-            signup_policy="yolo",
+            admin_email="not-an-email", scheme="ftp", signup_policy="yolo"
         )
 
         response = self.client.post("/admin/settings", data=form)
@@ -285,52 +207,225 @@ class SettingsPageTests(AdminTestCase):
         text = response.get_data(as_text=True)
         for message in (
             "Admin email must be an email address.",
-            "Discovery document must be an http or https URL.",
             "Redirect URI scheme must be http or https.",
             "Choose who can create an account.",
         ):
             self.assertIn(message, text)
-        self.assertEqual(self.settings.openid_client_id, "client-id")
+        self.assertEqual(self.settings.scheme, "https")
         self.assertEqual(self.settings.admin_email, ADMIN)
 
-    def test_secret_is_not_written_to_debug_log(self) -> None:
-        with self.assertLogs("jour.app", level="DEBUG") as logs:
-            self.client.post(
-                "/admin/settings",
-                data=self.valid_form(openid_client_secret="leaky-secret-123"),  # noqa: S106
+
+class ProviderAdminTests(AdminTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.sign_in_as(ADMIN)
+
+    def valid_form(self, **overrides: str) -> dict[str, str]:
+        form = {
+            "provider_id": "google",
+            "display_name": "Google",
+            "discovery_document": "https://accounts.google.com/.well-known/openid-configuration",
+            "client_id": "google-client",
+            "client_secret": "google-secret",
+            "is_enabled": "on",
+            "trust_email": "on",
+        }
+        form.update(overrides)
+        return form
+
+    def test_list_shows_providers_with_callback_urls_and_offers_presets(self) -> None:
+        self.add_provider("other")
+        jour.models.identities.link(self.database, "idp", "s", "some-user")
+
+        document = lxml.html.fromstring(self.page("/admin/providers"))
+
+        rows = {
+            tr.xpath("string(td[1]/div)"): (
+                tr.xpath("string(td[4])"),
+                tr.xpath("string(td[5])"),
             )
+            for tr in document.xpath("//tbody/tr")
+        }
+        self.assertEqual(
+            rows,
+            {
+                "idp": ("1", "https://localhost/authorize/idp"),
+                "other": ("0", "https://localhost/authorize/other"),
+            },
+        )
+        offered = document.xpath("//a[contains(@href, 'preset=')]/@href")
+        self.assertEqual(
+            sorted(offered),
+            [
+                "/admin/providers/new?preset=google",
+                "/admin/providers/new?preset=microsoft",
+            ],
+        )
 
-        self.assertNotIn("leaky-secret-123", "\n".join(logs.output))
-        self.assertEqual(self.settings.openid_client_secret, "leaky-secret-123")
+    def test_legacy_provider_shows_its_original_callback_url(self) -> None:
+        self.settings.legacy_provider = "idp"
 
+        document = lxml.html.fromstring(self.page("/admin/providers"))
 
-class SignInTrackingTests(AdminTestCase):
-    def test_sign_in_updates_last_sign_in(self) -> None:
-        user = self.make_user("other@example.test")
-        self.database.u("update users set last_sign_in_at = null")
-        self.settings.scheme = "http"
-        with (
-            mock.patch("jour.app.httpx.get") as http_get,
-            mock.patch("jour.app.httpx.post") as http_post,
-            mock.patch("jour.oidc.verify_id_token") as verify,
+        self.assertEqual(
+            document.xpath("string(//tbody/tr/td[5])"), "https://localhost/authorize"
+        )
+
+    def test_preset_prefills_the_new_provider_form(self) -> None:
+        document = lxml.html.fromstring(self.page("/admin/providers/new?preset=google"))
+
+        def value(name: str) -> str:
+            return document.xpath(f"string(//input[@name='{name}']/@value)")
+
+        self.assertEqual(value("provider_id"), "google")
+        self.assertEqual(value("display_name"), "Google")
+        self.assertIn("accounts.google.com", value("discovery_document"))
+        self.assertTrue(document.xpath("//input[@name='trust_email' and @checked]"))
+        self.assertIn("https://localhost/authorize/google", document.text_content())
+
+    def test_create_stores_provider_with_encrypted_secret(self) -> None:
+        response = self.client.post("/admin/providers/new", data=self.valid_form())
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.headers["Location"], "/admin/providers/google?saved=1"
+        )
+        provider = jour.models.providers.get(self.database, "google")
+        if provider is None:
+            self.fail("provider was not created")
+        self.assertEqual(provider["client_id"], "google-client")
+        self.assertTrue(provider["is_enabled"])
+        self.assertTrue(provider["trust_email"])
+        self.assertNotIn("google-secret", provider["client_secret"])
+        self.assertEqual(
+            jour.models.providers.client_secret(self.settings, provider),
+            "google-secret",
+        )
+
+    def test_edit_page_never_shows_the_secret(self) -> None:
+        provider = jour.models.providers.get(self.database, "idp")
+        if provider is None:
+            self.fail("provider missing")
+
+        html = self.page("/admin/providers/idp")
+
+        self.assertNotIn("provider-secret", html)
+        # The stored ciphertext must not be sent back to the browser either
+        self.assertNotIn(provider["client_secret"], html)
+        self.assertIn("A secret is set", html)
+        document = lxml.html.fromstring(html)
+        self.assertEqual(document.xpath("//input[@name='client_secret']/@value"), [""])
+
+    def test_secret_typed_into_a_rejected_form_is_not_echoed_back(self) -> None:
+        form = self.valid_form(
+            provider_id="idp",
+            client_id="",
+            client_secret="typed-secret",  # noqa: S106
+        )
+
+        response = self.client.post("/admin/providers/idp", data=form)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn("typed-secret", response.get_data(as_text=True))
+
+    def test_edit_keeps_secret_when_blank_and_replaces_when_given(self) -> None:
+        self.client.post(
+            "/admin/providers/idp",
+            data=self.valid_form(
+                provider_id="idp", display_name="Renamed", client_secret=""
+            ),
+        )
+        provider = jour.models.providers.get(self.database, "idp")
+        if provider is None:
+            self.fail("provider vanished")
+        self.assertEqual(provider["display_name"], "Renamed")
+        self.assertEqual(
+            jour.models.providers.client_secret(self.settings, provider),
+            "provider-secret",
+        )
+
+        self.client.post(
+            "/admin/providers/idp",
+            data=self.valid_form(provider_id="idp", client_secret="rotated"),  # noqa: S106
+        )
+        provider = jour.models.providers.get(self.database, "idp")
+        if provider is None:
+            self.fail("provider vanished")
+        self.assertEqual(
+            jour.models.providers.client_secret(self.settings, provider), "rotated"
+        )
+
+    def test_unchecked_boxes_disable_and_untrust(self) -> None:
+        form = self.valid_form(provider_id="idp")
+        del form["is_enabled"]
+        del form["trust_email"]
+
+        self.client.post("/admin/providers/idp", data=form)
+
+        provider = jour.models.providers.get(self.database, "idp")
+        if provider is None:
+            self.fail("provider vanished")
+        self.assertFalse(provider["is_enabled"])
+        self.assertFalse(provider["trust_email"])
+
+    def test_invalid_input_is_rejected(self) -> None:
+        form = self.valid_form(
+            provider_id="Bad ID!",
+            display_name="",
+            discovery_document="javascript:alert(1)",
+            client_id="",
+            client_secret="",
+        )
+
+        response = self.client.post("/admin/providers/new", data=form)
+
+        self.assertEqual(response.status_code, 400)
+        text = response.get_data(as_text=True)
+        for message in (
+            "ID must be lowercase letters",
+            "Name is required.",
+            "Discovery document must be an http or https URL.",
+            "Client ID is required.",
+            "Client secret is required.",
         ):
-            http_get.return_value.json.return_value = {"token_endpoint": "https://t"}
-            http_post.return_value.is_error = False
-            http_post.return_value.json.return_value = {"id_token": "x"}
-            verify.return_value = {
-                "email": "Other@Example.test",
-                "email_verified": True,
-            }
-            with self.client.session_transaction() as session:
-                session["state"] = "abc"
+            self.assertIn(message, text)
+        self.assertIsNone(jour.models.providers.get(self.database, "bad id!"))
 
-            self.client.get("/authorize?state=abc&code=xyz")
+    def test_cannot_create_a_duplicate_or_reserved_id(self) -> None:
+        duplicate = self.client.post(
+            "/admin/providers/new", data=self.valid_form(provider_id="idp")
+        )
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertIn("already exists", duplicate.get_data(as_text=True))
 
-        updated = jour.models.users.get_by_id(self.database, user["user_id"])
-        if updated is None:
-            self.fail("user vanished")
-        self.assertIsNotNone(updated["last_sign_in_at"])
+        reserved = self.client.post(
+            "/admin/providers/new", data=self.valid_form(provider_id="new")
+        )
+        self.assertEqual(reserved.status_code, 400)
 
+    def test_cannot_submit_the_form_without_a_secret_for_a_new_provider(self) -> None:
+        response = self.client.post(
+            "/admin/providers/new", data=self.valid_form(client_secret="")
+        )
 
-if __name__ == "__main__":
-    unittest.main()
+        self.assertEqual(response.status_code, 400)
+
+    def test_unknown_provider_is_404(self) -> None:
+        self.assertEqual(self.client.get("/admin/providers/nope").status_code, 404)
+        self.assertEqual(
+            self.client.post("/admin/providers/nope/delete").status_code, 404
+        )
+
+    def test_delete_removes_an_unused_provider(self) -> None:
+        response = self.client.post("/admin/providers/idp/delete")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIsNone(jour.models.providers.get(self.database, "idp"))
+
+    def test_delete_is_refused_while_users_sign_in_with_it(self) -> None:
+        jour.models.identities.link(self.database, "idp", "sub-1", "some-user")
+
+        response = self.client.post("/admin/providers/idp/delete")
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIsNotNone(jour.models.providers.get(self.database, "idp"))

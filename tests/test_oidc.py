@@ -37,6 +37,7 @@ def base_claims(**overrides: object) -> dict:
         "exp": now + dt.timedelta(minutes=5),
         "nonce": NONCE,
         "email": "alice@example.test",
+        "sub": "user-1",
     }
     claims.update(overrides)
     return {k: v for k, v in claims.items() if v is not None}
@@ -124,7 +125,7 @@ class VerifyIdTokenTests(unittest.TestCase):
         self.verify(make_token(base_claims(exp=just_expired)))
 
     def test_missing_required_claims_are_rejected(self) -> None:
-        for claim in ("exp", "iat", "iss", "aud"):
+        for claim in ("exp", "iat", "iss", "aud", "sub"):
             with self.subTest(claim=claim):
                 self.assert_rejected(make_token(base_claims(**{claim: None})))
 

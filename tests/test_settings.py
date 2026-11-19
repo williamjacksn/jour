@@ -23,10 +23,15 @@ class SettingsRegistryTest(unittest.TestCase):
             self.assertEqual(getattr(self.settings, name), value)
 
     def test_encrypted_values_not_stored_in_plaintext(self) -> None:
-        self.settings.set_by_name("openid_client_secret", "hunter2")
-        raw = self.settings.get_str("openid/client-secret")
+        self.settings.set_enc("test/secret", "hunter2")
+        raw = self.settings.get_str("test/secret")
         self.assertNotIn("hunter2", raw)
-        self.assertEqual(self.settings.openid_client_secret, "hunter2")
+        self.assertEqual(self.settings.get_enc("test/secret"), b"hunter2")
+        self.assertEqual(self.settings.decrypt(raw), "hunter2")
+
+    def test_empty_values_stay_empty(self) -> None:
+        self.assertEqual(self.settings.encrypt(""), "")
+        self.assertEqual(self.settings.decrypt(""), "")
 
 
 class SchemaVersionTest(unittest.TestCase):

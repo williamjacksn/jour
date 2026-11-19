@@ -420,6 +420,7 @@ def _admin_page(active: str, content: htpy.Node) -> str:
         ],
         htpy.ul(".mt-3.nav.nav-tabs")[
             tab("admin_users", "Users", "bi-people"),
+            tab("admin_providers", "Sign-in", "bi-box-arrow-in-right"),
             tab("admin_settings", "Settings", "bi-gear"),
         ],
         htpy.div(".pt-3")[content],
@@ -516,7 +517,6 @@ def admin_settings(
     errors: list[str],
     *,
     saved: bool = False,
-    secret_is_set: bool = False,
 ) -> str:
     def field(name: str, label: str, hint: str = "", type_: str = "text") -> htpy.Node:
         return htpy.div(".mb-3")[
@@ -546,14 +546,9 @@ def admin_settings(
         ]
         for value, text in (
             ("allowlist", "Only the administrator and the allowlist below"),
-            ("open", "Anyone who can sign in with the identity provider"),
+            ("open", "Anyone who can sign in with an enabled provider"),
         )
     ]
-    secret_hint = (
-        "A secret is set. Leave blank to keep it."
-        if secret_is_set
-        else "No secret is set."
-    )
     content = htpy.form(method="post")[
         htpy.div(".alert.alert-success")["Settings saved."] if saved else None,
         htpy.div(".alert.alert-danger")[htpy.ul(".mb-0")[(htpy.li[e] for e in errors)]]
@@ -583,22 +578,215 @@ def admin_settings(
                 "email",
             )
         ],
-        htpy.h2(".h5")["Identity provider"],
-        field("openid_client_id", "Client ID"),
-        field("openid_client_secret", "Client secret", secret_hint, "password"),
-        field("openid_discovery_document", "Discovery document URL", type_="url"),
+        htpy.h2(".h5")["Redirect URIs"],
         htpy.div(".mb-3")[
-            htpy.label(".form-label", for_="scheme")["Redirect URI scheme"],
+            htpy.label(".form-label", for_="scheme")["Scheme"],
             htpy.select(".form-select", id="scheme", name="scheme")[
                 (
                     htpy.option(selected=(values.get("scheme") == s), value=s)[s]
                     for s in ("https", "http")
                 )
             ],
+            htpy.div(".form-text")[
+                "Used to build the callback URL shown for each sign-in provider."
+            ],
         ],
         htpy.button(".btn.btn-success", type="submit")["Save"],
     ]
     return _admin_page("admin_settings", content)
+
+
+def _flag(value: object) -> htpy.Node:
+    return htpy.i(".bi-check-lg.text-success") if value else htpy.i(".bi-dash")
+
+
+def admin_providers(rows: list[dict], missing_presets: dict[str, str]) -> str:
+    def row(p: dict) -> htpy.Node:
+        return htpy.tr[
+            htpy.td[
+                htpy.a(
+                    href=flask.url_for("admin_provider", provider_id=p["provider_id"])
+                )[p["display_name"]],
+                htpy.div(".small.text-body-secondary")[p["provider_id"]],
+            ],
+            htpy.td(".text-center")[_flag(p["is_enabled"])],
+            htpy.td(".text-center")[_flag(p["trust_email"])],
+            htpy.td(".text-end")[p["linked_users"]],
+            htpy.td(".small.text-break")[htpy.code[p["redirect_uri"]]],
+            htpy.td(".text-end.text-nowrap")[
+                htpy.form(
+                    ".d-inline",
+                    action=flask.url_for(
+                        "admin_provider_delete", provider_id=p["provider_id"]
+                    ),
+                    method="post",
+                )[
+                    htpy.button(
+                        ".btn.btn-sm.btn-outline-danger",
+                        aria_label="Delete",
+                        disabled=bool(p["linked_users"]),
+                        onclick="return confirm('Delete this sign-in provider?')",
+                        title="Delete"
+                        if not p["linked_users"]
+                        else "In use: disable it instead",
+                        type="submit",
+                    )[htpy.i(".bi-trash")]
+                ]
+            ],
+        ]
+
+    add_buttons = [
+        htpy.a(
+            ".btn.btn-outline-success.me-2",
+            href=flask.url_for("admin_provider_new", preset=preset_id),
+        )[htpy.i(".bi-plus-lg.me-1"), f"Add {name}"]
+        for preset_id, name in missing_presets.items()
+    ]
+    content = [
+        htpy.div(".table-responsive")[
+            htpy.table(".align-middle.table.table-sm")[
+                htpy.thead[
+                    htpy.tr[
+                        htpy.th["Provider"],
+                        htpy.th(".text-center")["Enabled"],
+                        htpy.th(".text-center")["Trusts email"],
+                        htpy.th(".text-end")["Users"],
+                        htpy.th["Callback URL"],
+                        htpy.th,
+                    ]
+                ],
+                htpy.tbody[(row(p) for p in rows)],
+            ]
+        ]
+        if rows
+        else htpy.p(".text-body-secondary")["No sign-in providers yet."],
+        htpy.div[
+            add_buttons,
+            htpy.a(
+                ".btn.btn-outline-secondary", href=flask.url_for("admin_provider_new")
+            )[htpy.i(".bi-plus-lg.me-1"), "Add other"],
+        ],
+    ]
+    return _admin_page("admin_providers", content)
+
+
+def admin_provider_form(
+    values: dict,
+    errors: list[str],
+    *,
+    is_new: bool,
+    secret_is_set: bool,
+    redirect_uri: str,
+    saved: bool = False,
+) -> str:
+    def field(
+        name: str,
+        label: str,
+        hint: str = "",
+        type_: str = "text",
+        *,
+        readonly: bool = False,
+    ) -> htpy.Node:
+        return htpy.div(".mb-3")[
+            htpy.label(".form-label", for_=name)[label],
+            htpy.input(
+                ".form-control",
+                id=name,
+                name=name,
+                readonly=readonly,
+                type=type_,
+                # Never put a secret (even encrypted) back into the page
+                value="" if type_ == "password" else values.get(name, ""),
+            ),
+            htpy.div(".form-text")[hint] if hint else None,
+        ]
+
+    def check(name: str, label: str, hint: str) -> htpy.Node:
+        return htpy.div(".mb-3")[
+            htpy.div(".form-check")[
+                htpy.input(
+                    ".form-check-input",
+                    checked=bool(values.get(name)),
+                    id=name,
+                    name=name,
+                    type="checkbox",
+                ),
+                htpy.label(".form-check-label", for_=name)[label],
+            ],
+            htpy.div(".form-text")[hint],
+        ]
+
+    secret_hint = (
+        "A secret is set. Leave blank to keep it."
+        if secret_is_set
+        else "The client secret from the provider's console."
+    )
+    content = htpy.form(method="post")[
+        htpy.div(".alert.alert-success")["Provider saved."] if saved else None,
+        htpy.div(".alert.alert-danger")[htpy.ul(".mb-0")[(htpy.li[e] for e in errors)]]
+        if errors
+        else None,
+        field(
+            "provider_id",
+            "ID",
+            "Short and permanent: it appears in the callback URL. For example google.",
+            readonly=not is_new,
+        ),
+        field("display_name", "Name", "Shown on the sign-in page."),
+        field(
+            "discovery_document",
+            "Discovery document URL",
+            "Ends in /.well-known/openid-configuration.",
+            "url",
+        ),
+        field("client_id", "Client ID"),
+        field("client_secret", "Client secret", secret_hint, "password"),
+        check("is_enabled", "Enabled", "Disabled providers are hidden at sign-in."),
+        check(
+            "trust_email",
+            "Trust this provider's email addresses",
+            "Lets a sign-in link to an existing account with the same email. "
+            "Only turn on for providers that verify email ownership.",
+        ),
+        htpy.div(".mb-3")[
+            htpy.div(".form-label")["Callback URL"],
+            htpy.code(".user-select-all")[redirect_uri],
+            htpy.div(".form-text")[
+                "Register this exact URL as an authorized redirect URI "
+                "in the provider's console."
+            ],
+        ],
+        htpy.button(".btn.btn-success.me-2", type="submit")["Save"],
+        htpy.a(".btn.btn-outline-secondary", href=flask.url_for("admin_providers"))[
+            "Back"
+        ],
+    ]
+    return _admin_page("admin_providers", content)
+
+
+def sign_in_chooser(providers: list[dict]) -> str:
+    content = htpy.main(
+        ".d-flex.flex-column.justify-content-center.min-vh-100.py-5.text-center"
+    )[
+        htpy.h1(".h2.fw-semibold.mb-4")["Sign in to Jour"],
+        htpy.div(".d-grid.gap-3.col-12.col-sm-8.mx-auto")[
+            (
+                htpy.a(
+                    ".btn.btn-outline-success.btn-lg",
+                    href=flask.url_for("sign_in_with", provider_id=p["provider_id"]),
+                )[f"Continue with {p['display_name']}"]
+                for p in providers
+            )
+        ],
+    ]
+    return str(_base(content))
+
+
+def no_providers() -> str:
+    return _message_page(
+        "Sign-in unavailable",
+        "No sign-in method is set up yet. Ask the administrator.",
+    )
 
 
 def _message_page(title: str, text: str) -> str:

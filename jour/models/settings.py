@@ -19,22 +19,6 @@ REGISTRY: dict[str, SettingDef] = {
     d.name: d
     for d in (
         SettingDef(
-            "openid_client_id",
-            "openid/client-id",
-            "OpenID Connect client ID",
-        ),
-        SettingDef(
-            "openid_client_secret",
-            "openid/client-secret",
-            "OpenID Connect client secret",
-            encrypted=True,
-        ),
-        SettingDef(
-            "openid_discovery_document",
-            "openid/discovery-document",
-            "URL of the OpenID Connect discovery document",
-        ),
-        SettingDef(
             "scheme",
             "flask/scheme",
             "URL scheme (http or https) used to build the redirect URI",
@@ -103,12 +87,21 @@ class Settings:
         }
         self.db.u(sql, params)
 
+    def decrypt(self, token: str) -> str:
+        """Decrypt a value produced by `encrypt`; empty stays empty."""
+        if not token:
+            return ""
+        f = cryptography.fernet.Fernet(self.secret_key)
+        return f.decrypt(token).decode()
+
+    def encrypt(self, value: str) -> str:
+        if not value:
+            return ""
+        f = cryptography.fernet.Fernet(self.secret_key)
+        return f.encrypt(value.encode()).decode()
+
     def get_enc(self, setting_id: str) -> bytes:
-        val = self._get(setting_id)
-        if val:
-            f = cryptography.fernet.Fernet(self.secret_key)
-            return f.decrypt(val)
-        return b""
+        return self.decrypt(self._get(setting_id) or "").encode()
 
     def get_str(self, setting_id: str) -> str:
         val = self._get(setting_id)
@@ -122,30 +115,6 @@ class Settings:
             from settings
         """
         return {row["setting_id"] for row in self.db.q(sql)}
-
-    @property
-    def openid_client_id(self) -> str:
-        return self.get_str("openid/client-id")
-
-    @openid_client_id.setter
-    def openid_client_id(self, value: str) -> None:
-        self.set_str("openid/client-id", value)
-
-    @property
-    def openid_client_secret(self) -> str:
-        return self.get_enc("openid/client-secret").decode()
-
-    @openid_client_secret.setter
-    def openid_client_secret(self, value: str) -> None:
-        self.set_enc("openid/client-secret", value)
-
-    @property
-    def openid_discovery_document(self) -> str:
-        return self.get_str("openid/discovery-document")
-
-    @openid_discovery_document.setter
-    def openid_discovery_document(self, value: str) -> None:
-        self.set_str("openid/discovery-document", value)
 
     @property
     def scheme(self) -> str:
@@ -164,8 +133,7 @@ class Settings:
         return self._get(setting_id)
 
     def set_enc(self, setting_id: str, setting_value: str) -> None:
-        f = cryptography.fernet.Fernet(self.secret_key)
-        self._set(setting_id, f.encrypt(setting_value.encode()).decode())
+        self._set(setting_id, self.encrypt(setting_value))
 
     def set_str(self, setting_id: str, setting_value: str) -> None:
         self._set(setting_id, setting_value)
@@ -193,3 +161,12 @@ class Settings:
     @signup_policy.setter
     def signup_policy(self, value: str) -> None:
         self.set_str("signup/policy", value)
+
+    @property
+    def legacy_provider(self) -> str:
+        """Provider whose callback is still served at the old /authorize URL."""
+        return self.get_str("signin/legacy-provider")
+
+    @legacy_provider.setter
+    def legacy_provider(self, value: str) -> None:
+        self.set_str("signin/legacy-provider", value)

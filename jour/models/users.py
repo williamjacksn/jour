@@ -67,13 +67,13 @@ def get_or_create(db: fort.SQLiteDatabase, email: str) -> dict:
     return created
 
 
-def record_sign_in(db: fort.SQLiteDatabase, email: str) -> None:
+def record_sign_in(db: fort.SQLiteDatabase, user_id: str) -> None:
     sql = """
         update users
         set last_sign_in_at = :now
-        where email = :email
+        where user_id = :user_id
     """
-    db.u(sql, {"now": _now(), "email": normalize_email(email)})
+    db.u(sql, {"now": _now(), "user_id": user_id})
 
 
 def set_disabled(db: fort.SQLiteDatabase, user_id: str, *, disabled: bool) -> None:
@@ -86,4 +86,6 @@ def set_disabled(db: fort.SQLiteDatabase, user_id: str, *, disabled: bool) -> No
 
 
 def delete(db: fort.SQLiteDatabase, user_id: str) -> None:
-    db.u("delete from users where user_id = :user_id", {"user_id": user_id})
+    params = {"user_id": user_id}
+    db.u("delete from identities where user_id = :user_id", params)
+    db.u("delete from users where user_id = :user_id", params)

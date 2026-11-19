@@ -36,17 +36,12 @@ def login_required(f: typing.Callable) -> typing.Callable:
     @functools.wraps(f)
     def decorated_function(*args, **kwargs) -> typing.Any:  # noqa: ANN002, ANN003, ANN401
         app.logger.debug(f"Logged in user: {flask.g.email}")
-        if flask.g.email is None:
-            return jour.components.landing()
-        user = jour.models.users.get_by_email(flask.g.db, flask.g.email)
+        user = flask.g.user
         if user is None:
-            if not jour.models.access.signup_allowed(flask.g.settings, flask.g.email):
-                return jour.components.not_invited(), 403
-            user = jour.models.users.get_or_create(flask.g.db, flask.g.email)
+            return jour.components.landing()
         # The administrator can never be locked out by the disabled flag
         if user["is_disabled"] and not flask.g.is_admin:
             return jour.components.account_disabled(), 403
-        flask.g.user = user
         # Every user gets a journal database of their own
         flask.g.user_db = jour.models.userdb.open_db(user["user_id"])
         return f(*args, **kwargs)
@@ -75,7 +70,10 @@ def before_request() -> None:
     flask.session.permanent = True
     flask.g.db = _get_db()
     flask.g.settings = jour.models.settings.Settings(flask.g.db)
-    flask.g.email = flask.session.get("email")
+    # The session holds only a user id. A user deleted by the admin is signed out
+    user_id = flask.session.get("user_id")
+    flask.g.user = jour.models.users.get_by_id(flask.g.db, user_id) if user_id else None
+    flask.g.email = flask.g.user["email"] if flask.g.user else None
     flask.g.is_admin = jour.models.access.is_admin(
         flask.g.settings.admin_email, flask.g.email
     )
@@ -218,8 +216,6 @@ def admin_user_delete(user_id: str) -> werkzeug.Response:
 
 SETTINGS_FIELDS = (
     "admin_email",
-    "openid_client_id",
-    "openid_discovery_document",
     "scheme",
     "signup_allowlist",
     "signup_policy",
@@ -234,11 +230,6 @@ def _validate_settings(
     values["admin_email"] = jour.models.users.normalize_email(values["admin_email"])
     if "@" not in values["admin_email"] or " " in values["admin_email"]:
         errors.append("Admin email must be an email address.")
-    if not values["openid_client_id"]:
-        errors.append("Client ID is required.")
-    discovery = urllib.parse.urlparse(values["openid_discovery_document"])
-    if discovery.scheme not in ("http", "https") or not discovery.netloc:
-        errors.append("Discovery document must be an http or https URL.")
     if values["scheme"] not in ("http", "https"):
         errors.append("Redirect URI scheme must be http or https.")
     if values["signup_policy"] not in jour.models.access.POLICIES:
@@ -256,69 +247,250 @@ def admin_settings() -> str | tuple[str, int] | werkzeug.Response:
     if flask.request.method == "POST":
         values, errors = _validate_settings(flask.request.form)
         if errors:
-            return (
-                jour.components.admin_settings(
-                    values, errors, secret_is_set=bool(s.openid_client_secret)
-                ),
-                400,
-            )
+            return jour.components.admin_settings(values, errors), 400
         for name, value in values.items():
             s.set_by_name(name, value)
-        secret = flask.request.form.get("openid_client_secret", "").strip()
-        if secret:
-            s.openid_client_secret = secret
         return flask.redirect(flask.url_for("admin_settings", saved=1))
     values = {name: s.get_by_name(name) for name in SETTINGS_FIELDS}
     return jour.components.admin_settings(
-        values,
-        [],
-        saved=flask.request.args.get("saved") == "1",
-        secret_is_set=bool(s.openid_client_secret),
+        values, [], saved=flask.request.args.get("saved") == "1"
     )
 
 
+def _redirect_uri(provider_id: str) -> str:
+    """The callback URL to register with the provider."""
+    scheme = flask.g.settings.scheme or flask.request.scheme
+    if provider_id == flask.g.settings.legacy_provider:
+        # Keeps the URL registered before there were multiple providers working
+        return flask.url_for("authorize_legacy", _external=True, _scheme=scheme)
+    return flask.url_for(
+        "authorize", provider_id=provider_id, _external=True, _scheme=scheme
+    )
+
+
+@app.get("/admin/providers")
+@admin_required
+def admin_providers() -> str:
+    providers = jour.models.providers.list_all(flask.g.db)
+    counts = jour.models.identities.count_by_provider(flask.g.db)
+    rows = [
+        {
+            **p,
+            "linked_users": counts.get(p["provider_id"], 0),
+            "redirect_uri": _redirect_uri(p["provider_id"]),
+        }
+        for p in providers
+    ]
+    existing = {p["provider_id"] for p in providers}
+    missing_presets = {
+        k: v.display_name
+        for k, v in jour.models.providers.PRESETS.items()
+        if k not in existing
+    }
+    return jour.components.admin_providers(rows, missing_presets)
+
+
+def _preset_values() -> dict[str, typing.Any]:
+    """Blank form values, filled in from `?preset=` when it names a known preset."""
+    preset_id = flask.request.args.get("preset", "")
+    preset = jour.models.providers.PRESETS.get(preset_id)
+    values: dict[str, typing.Any] = {
+        "provider_id": "",
+        "display_name": "",
+        "discovery_document": "",
+        "client_id": "",
+        "is_enabled": True,
+        "trust_email": False,
+    }
+    if preset:
+        values["provider_id"] = preset_id
+        values["display_name"] = preset.display_name
+        values["discovery_document"] = preset.discovery_document
+        values["trust_email"] = preset.trust_email
+    return values
+
+
+@app.route("/admin/providers/new", methods=["GET", "POST"])
+@admin_required
+def admin_provider_new() -> str | tuple[str, int] | werkzeug.Response:
+    if flask.request.method == "POST":
+        provider_id = flask.request.form.get("provider_id", "").strip().lower()
+        return _save_provider(provider_id, is_new=True)
+    values = _preset_values()
+    return jour.components.admin_provider_form(
+        values,
+        [],
+        is_new=True,
+        secret_is_set=False,
+        redirect_uri=_redirect_uri(values["provider_id"] or "ID"),
+    )
+
+
+@app.route("/admin/providers/<provider_id>", methods=["GET", "POST"])
+@admin_required
+def admin_provider(provider_id: str) -> str | tuple[str, int] | werkzeug.Response:
+    provider = jour.models.providers.get(flask.g.db, provider_id)
+    if provider is None:
+        flask.abort(404)
+    if flask.request.method == "POST":
+        return _save_provider(provider_id, is_new=False)
+    values = {
+        "provider_id": provider["provider_id"],
+        "display_name": provider["display_name"],
+        "discovery_document": provider["discovery_document"],
+        "client_id": provider["client_id"],
+        "is_enabled": bool(provider["is_enabled"]),
+        "trust_email": bool(provider["trust_email"]),
+    }
+    return jour.components.admin_provider_form(
+        values,
+        [],
+        is_new=False,
+        secret_is_set=bool(provider["client_secret"]),
+        redirect_uri=_redirect_uri(provider_id),
+        saved=flask.request.args.get("saved") == "1",
+    )
+
+
+def _save_provider(provider_id: str, *, is_new: bool) -> typing.Any:  # noqa: ANN401
+    form = flask.request.form
+    existing = jour.models.providers.get(flask.g.db, provider_id)
+    secret = form.get("client_secret", "").strip()
+    values = {
+        "provider_id": provider_id,
+        "display_name": form.get("display_name", "").strip(),
+        "discovery_document": form.get("discovery_document", "").strip(),
+        "client_id": form.get("client_id", "").strip(),
+        "is_enabled": form.get("is_enabled") == "on",
+        "trust_email": form.get("trust_email") == "on",
+    }
+    has_stored_secret = bool(existing and existing["client_secret"])
+    errors = jour.models.providers.validate(
+        provider_id,
+        display_name=values["display_name"],
+        discovery_document=values["discovery_document"],
+        client_id=values["client_id"],
+        has_secret=bool(secret or has_stored_secret),
+    )
+    if is_new and existing:
+        errors.append("A provider with that ID already exists.")
+    if errors:
+        return (
+            jour.components.admin_provider_form(
+                values,
+                errors,
+                is_new=is_new,
+                secret_is_set=has_stored_secret,
+                redirect_uri=_redirect_uri(provider_id or "ID"),
+            ),
+            400,
+        )
+    jour.models.providers.save(
+        flask.g.db,
+        flask.g.settings,
+        provider_id,
+        display_name=values["display_name"],
+        discovery_document=values["discovery_document"],
+        client_id=values["client_id"],
+        secret=secret or None,
+        is_enabled=values["is_enabled"],
+        trust_email=values["trust_email"],
+    )
+    return flask.redirect(
+        flask.url_for("admin_provider", provider_id=provider_id, saved=1)
+    )
+
+
+@app.post("/admin/providers/<provider_id>/delete")
+@admin_required
+def admin_provider_delete(provider_id: str) -> werkzeug.Response:
+    if jour.models.providers.get(flask.g.db, provider_id) is None:
+        flask.abort(404)
+    counts = jour.models.identities.count_by_provider(flask.g.db)
+    if counts.get(provider_id):
+        # Deleting would strand the people who sign in with it. Disable it instead
+        flask.abort(409)
+    jour.models.providers.delete(flask.g.db, provider_id)
+    return flask.redirect(flask.url_for("admin_providers"))
+
+
+FAILURE_RESPONSES: dict[str, str] = {
+    "no_subject": "Your account has no identifier.",
+    "no_email": "An email address is required.",
+    "unverified": "A verified email address is required.",
+    "email_in_use": (
+        "An account with this email already exists. "
+        "Sign in with the provider you used before."
+    ),
+}
+
+
 @app.get("/authorize")
-def authorize() -> werkzeug.Response:
-    # Both are single use: pop them so a replayed callback cannot succeed
+def authorize_legacy() -> werkzeug.Response | str | tuple[str, int]:
+    """The callback URL used before there were several providers."""
+    return authorize(flask.g.settings.legacy_provider)
+
+
+@app.get("/authorize/<provider_id>")
+def authorize(provider_id: str) -> werkzeug.Response | str | tuple[str, int]:
+    # All three are single use: pop them so a replayed callback cannot succeed
     state = flask.session.pop("state", None)
     nonce = flask.session.pop("nonce", None)
-    if not state or state != flask.request.values.get("state"):
+    expected_provider = flask.session.pop("provider", None)
+    if (
+        not state
+        or state != flask.request.values.get("state")
+        or expected_provider != provider_id
+    ):
         return flask.Response("State mismatch", 401)
-    discovery_document = httpx.get(flask.g.settings.openid_discovery_document).json()
+    provider = jour.models.providers.get(flask.g.db, provider_id)
+    if provider is None or not provider["is_enabled"]:
+        return flask.Response("Unknown sign-in provider", 400)
+    discovery_document = httpx.get(provider["discovery_document"]).json()
     token_endpoint = discovery_document.get("token_endpoint")
     data = {
         "code": flask.request.values.get("code"),
-        "client_id": flask.g.settings.openid_client_id,
-        "client_secret": flask.g.settings.openid_client_secret,
-        "redirect_uri": flask.url_for(
-            "authorize", _external=True, _scheme=flask.g.settings.scheme
+        "client_id": provider["client_id"],
+        "client_secret": jour.models.providers.client_secret(
+            flask.g.settings, provider
         ),
+        "redirect_uri": _redirect_uri(provider_id),
         "grant_type": "authorization_code",
     }
     response = httpx.post(token_endpoint, data=data)
     if response.is_error:
         # The error body describes the problem and contains no secrets
         app.logger.warning(
-            f"Token request failed: {response.status_code} {response.text}"
+            f"Token request failed ({provider_id}): "
+            f"{response.status_code} {response.text}"
         )
     response.raise_for_status()
     response_data = response.json()
     id_token = response_data.get("id_token")
     try:
-        claim = jour.oidc.verify_id_token(
+        claims = jour.oidc.verify_id_token(
             id_token or "",
             discovery_document=discovery_document,
-            client_id=flask.g.settings.openid_client_id,
+            client_id=provider["client_id"],
             nonce=nonce or "",
         )
     except jour.oidc.InvalidIdTokenError as e:
-        app.logger.warning(f"Rejected ID token: {e}")
+        app.logger.warning(f"Rejected ID token ({provider_id}): {e}")
         return flask.Response("Could not verify your sign-in", 401)
-    email = claim.get("email")
-    if not email or claim.get("email_verified") is False:
-        return flask.Response("A verified email address is required", 403)
-    flask.session["email"] = jour.models.users.normalize_email(email)
-    jour.models.users.record_sign_in(flask.g.db, email)
+    user, failure = jour.models.signin.resolve_user(
+        flask.g.db, flask.g.settings, provider, claims
+    )
+    if user is None:
+        app.logger.info(f"Sign-in refused ({provider_id}): {failure}")
+        if failure == "not_invited":
+            return jour.components.not_invited(), 403
+        message = FAILURE_RESPONSES.get(failure or "", "Sign-in refused.")
+        return flask.Response(message, 403)
+    # Start a fresh session so nothing from before sign-in carries over
+    flask.session.clear()
+    flask.session.permanent = True
+    flask.session["user_id"] = user["user_id"]
+    jour.models.users.record_sign_in(flask.g.db, user["user_id"])
     return flask.redirect(flask.url_for("index"))
 
 
@@ -366,23 +538,36 @@ def sign_out() -> werkzeug.Response:
 
 
 @app.get("/sign-in")
-def sign_in() -> werkzeug.Response:
+def sign_in() -> werkzeug.Response | str | tuple[str, int]:
+    providers = jour.models.providers.list_enabled(flask.g.db)
+    if not providers:
+        return jour.components.no_providers(), 503
+    if len(providers) == 1:
+        return flask.redirect(
+            flask.url_for("sign_in_with", provider_id=providers[0]["provider_id"])
+        )
+    return jour.components.sign_in_chooser(providers)
+
+
+@app.get("/sign-in/<provider_id>")
+def sign_in_with(provider_id: str) -> werkzeug.Response:
+    provider = jour.models.providers.get(flask.g.db, provider_id)
+    if provider is None or not provider["is_enabled"]:
+        flask.abort(404)
     state = secrets.token_urlsafe(32)
     nonce = secrets.token_urlsafe(32)
     flask.session["state"] = state
     flask.session["nonce"] = nonce
-    redirect_uri = flask.url_for(
-        "authorize", _external=True, _scheme=flask.g.settings.scheme
-    )
+    flask.session["provider"] = provider_id
     query = {
-        "client_id": flask.g.settings.openid_client_id,
+        "client_id": provider["client_id"],
         "response_type": "code",
         "scope": "openid email profile",
-        "redirect_uri": redirect_uri,
+        "redirect_uri": _redirect_uri(provider_id),
         "state": state,
         "nonce": nonce,
     }
-    discovery_document = httpx.get(flask.g.settings.openid_discovery_document).json()
+    discovery_document = httpx.get(provider["discovery_document"]).json()
     auth_endpoint = discovery_document.get("authorization_endpoint")
     auth_url = f"{auth_endpoint}?{urllib.parse.urlencode(query)}"
     app.logger.debug(f"Redirecting to {auth_url=}")
